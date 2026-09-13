@@ -2,11 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import ConvenienceStoreScene from './components/ConvenienceStoreScene'
 import DialoguePanel from './components/DialoguePanel'
 import { characters, catFeedback } from './data/characters'
+import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 
 export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [catActive, setCatActive] = useState(false)
   const catTimer = useRef(null)
+  const [histories, setHistories] = useState({ kai: [], mira: [] })
+
+  function completeTurn(npc, message, reply) {
+    setHistories(previous => ({
+      ...previous,
+      [npc]: [...previous[npc], { role: 'user', content: message },
+        { role: 'assistant', content: reply }].slice(-MAX_HISTORY_MESSAGES),
+    }))
+  }
 
   function closeDialogue() {
     setSelectedId(null)
@@ -39,7 +49,7 @@ export default function App() {
       <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} />
       <div className="interaction-area">
         {selectedId
-          ? <DialoguePanel key={selectedId} character={characters[selectedId]} onClose={closeDialogue} />
+          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} onComplete={completeTurn} onClose={closeDialogue} />
           : <div className="scene-invitation"><span>· · ·</span><p>No rush. The rain isn’t going anywhere.</p><small>点击角色，聊上几句</small></div>}
       </div>
     </div>

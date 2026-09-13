@@ -250,3 +250,13 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
   font-family: 'Courier New', 'PingFang SC', 'Microsoft YaHei', monospace;
 }
 .dialogue-identity > span { font-size: 10px; letter-spacing: 1px; }
+
+/* Stage 2.1: one quiet input row within the existing game text window. */
+.dialogue-input { display: flex; gap: 12px; margin-top: 12px; border-top: 1px solid #89928c44; padding-top: 9px; }
+.dialogue-input input { min-width: 0; flex: 1; border: 0; border-bottom: 1px solid #89928c66; background: #0c172566; color: #ddd5c6; font: inherit; font-size: 13px; padding: 7px 6px; }
+.dialogue-input input:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
+.dialogue-input button { border: 0; background: none; color: var(--gold); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.dialogue button:disabled { opacity: .45; cursor: default; }
+.request-status { height: 14px; color: var(--gold); font-size: 12px; }
+.dialogue-error { color: #cfb39a; font-size: 11px; line-height: 1.6; margin: 4px 0 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
