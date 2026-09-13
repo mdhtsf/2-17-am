@@ -1,0 +1,252 @@
+:root {
+  font-family: 'Courier New', Courier, monospace;
+  color: #dfd0b6;
+  background: #101d30;
+  color-scheme: dark;
+  font-synthesis: none;
+  --night-blue: #101d30;
+  --store-warm: #e8c394;
+  --cold-glow: #b2dce5;
+  --pixel-border: #89928c;
+  --hud-text: #aab7c6;
+  --gold: var(--store-warm);
+  --muted: #9ca7b4;
+  --hud-inset: clamp(16px, 2.2vw, 34px);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button { font: inherit; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 5px; }
+button { -webkit-tap-highlight-color: transparent; }
+.game {
+  height: 100svh;
+  min-height: 420px;
+  overflow: hidden;
+  background: var(--night-blue);
+  position: relative;
+}
+/* HUD has no layout height: the world runs behind every edge of the window. */
+.game-header {
+  position: absolute;
+  inset: var(--hud-inset) var(--hud-inset) auto;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  text-shadow: 2px 2px #101927;
+}
+h1 { font-size: 28px; letter-spacing: -2px; margin: 0 0 5px; color: #efcf9f; text-shadow: 2px 2px #453e3c; }
+h1 span { font-size: 22px; letter-spacing: 0; }
+h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vertical-align: middle; margin-left: 16px; }
+.game-title p { font-size: 11px; color: #adb5c0; margin: 0; }
+.weather-readout { font-size: 9px; color: #c0b5a6; letter-spacing: 2px; text-align: right; }
+.weather-readout > span { display: block; color: #74889e; font-size: 8px; margin-top: 10px; letter-spacing: 1px; }
+.weather-readout i { display: inline-block; width: 4px; height: 4px; background: #9ab3c3; margin-right: 9px; }
+.world-viewport {
+  position: relative;
+  height: 100svh;
+  min-height: 420px;
+  overflow: hidden;
+}
+.scene {
+  /* Background and hotspots share this exact art-sized box. Cover crops both
+     layers together, so no viewport-specific hotspot offsets are necessary. */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100vw, calc(100svh * var(--scene-aspect)));
+  aspect-ratio: var(--scene-aspect);
+  transform: translate(-50%, -50%);
+  isolation: isolate;
+}
+.scene-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+.scene-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: linear-gradient(#08101e66, transparent 16% 82%, #08101e70);
+}
+.location-caption {
+  position: absolute;
+  top: 91px;
+  left: var(--hud-inset);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #c2b194;
+  pointer-events: none;
+  text-shadow: 2px 2px #101d30;
+}
+.location-caption small { display: none; }
+.moon { font-size: 19px; line-height: 1; }
+/* Window rain is clipped to the exterior and glass; none falls inside the shop. */
+.weather-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.rain-drop {
+  position: absolute;
+  width: 2px;
+  height: 9px;
+  background: #88a7c166;
+  box-shadow: -2px 5px #88a7c133;
+  animation: rain-fall var(--duration) steps(9) var(--delay) infinite;
+}
+@keyframes rain-fall { from { translate: 0 -15px; opacity: 0; } 20% { opacity: .7; } to { translate: -12px 40px; opacity: 0; } }
+/* A single overlay shares the image geometry; it never paints character art. */
+.npc-overlay { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.npc {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  color: #efd3a6;
+}
+.npc-indicator {
+  position: absolute;
+  bottom: 103%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(12px, 1.5vw, 22px);
+  line-height: 1;
+  color: #f0d2a0;
+  text-shadow: 2px 2px #1c2937;
+}
+.hotspot-marker {
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 5px;
+  height: 2px;
+  background: var(--gold);
+  box-shadow: -5px -2px var(--gold), 5px -2px var(--gold);
+  opacity: 0;
+  pointer-events: none;
+}
+.npc:hover .hotspot-marker, .npc:focus-visible .hotspot-marker, .npc.selected .hotspot-marker { opacity: .85; }
+.npc-label {
+  position: absolute;
+  bottom: 110%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 5px 9px 4px;
+  background: #132131f2;
+  box-shadow: 2px 0 #788080, -2px 0 #788080, 0 2px #788080, 0 -2px #788080;
+  font-size: clamp(9px, 1vw, 14px);
+  line-height: 1.4;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+}
+.npc-label small { display: block; font-size: 10px; color: #a9b4bd; line-height: 1.2; }
+.npc:hover .npc-label, .npc:focus-visible .npc-label, .npc.selected .npc-label { opacity: 1; }
+.npc:hover .npc-indicator, .npc:focus-visible .npc-indicator, .npc.selected .npc-indicator { opacity: 0; }
+.npc.selected .npc-label { color: #ffe0a9; box-shadow: 2px 0 #c3a375, -2px 0 #c3a375, 0 2px #c3a375, 0 -2px #c3a375; }
+/* Dialogue stays in the world as a traditional game text window. */
+.interaction-area {
+  position: absolute;
+  z-index: 12;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(740px, 68%);
+  pointer-events: none;
+}
+.dialogue {
+  position: relative;
+  pointer-events: auto;
+  background: #101c2af2;
+  box-shadow: 3px 0 var(--pixel-border), -3px 0 var(--pixel-border), 0 3px var(--pixel-border), 0 -3px var(--pixel-border), 6px 0 #162433, -6px 0 #162433, 0 6px #162433, 0 -6px #162433, 8px 10px #08142188;
+  padding: 18px 26px 17px;
+  max-height: 42svh;
+  overflow-y: auto;
+  scrollbar-color: var(--pixel-border) var(--night-blue);
+  animation: text-window .16s steps(3);
+}
+.dialogue-identity { display: flex; align-items: center; gap: 17px; margin-bottom: 14px; }
+.dialogue h2 { margin: 0; color: #efd0a2; font-size: 19px; }
+.dialogue-identity > span { font-size: 8px; letter-spacing: 1.5px; color: #879aaa; }
+.spoken { color: #ddd5c6; font-size: 17px; line-height: 1.65; margin: 0 0 9px; }
+.stage-direction { color: #9ba7af; font-size: 11px; line-height: 1.6; margin: 0 0 12px; }
+.replies { display: flex; gap: 8px 22px; flex-wrap: wrap; }
+.replies button { padding: 4px 0; border: 0; background: none; color: #b4b8b7; text-align: left; font-size: 11px; cursor: pointer; }
+.replies button span { color: #a7916d; }
+.replies button:hover, .replies button[aria-pressed=true] { color: #f4d4a0; }
+.close-dialogue { position: absolute; top: 10px; right: 12px; border: 0; background: none; color: #9ca9b0; cursor: pointer; font-size: 24px; width: 28px; height: 28px; }
+.close-dialogue:focus-visible { outline-offset: 1px; }
+.dialogue-corner { position: absolute; bottom: 12px; right: 15px; color: #d6be99; }
+@keyframes text-window { from { opacity: 0; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+.scene-invitation { text-align: center; color: #c4c5bd; text-shadow: 1px 2px #101c2b; padding: 8px 10px; background: #101d30b8; max-width: 420px; margin: auto; }
+.scene-invitation > span { color: #c4a77d; }
+.scene-invitation p { margin: 5px 0 9px; font-size: 12px; }
+.scene-invitation small { font-size: 8px; letter-spacing: 1px; color: #96a5b6; }
+.cat-feedback { position: absolute; z-index: 20; top: 78px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90%; font-size: 12px; line-height: 1.7; padding: 12px 18px; background: #152336f5; color: #e2cba9; box-shadow: 2px 0 #889089, -2px 0 #889089, 0 2px #889089, 0 -2px #889089; opacity: 0; pointer-events: none; }
+.cat-feedback.visible { opacity: 1; }
+.game-footer { position: absolute; bottom: 12px; left: var(--hud-inset); right: var(--hud-inset); display: flex; align-items: flex-end; justify-content: space-between; pointer-events: none; z-index: 10; font-size: 8px; line-height: 1.6; letter-spacing: 1px; color: #8a9bb2; text-shadow: 2px 2px #101d30; }
+.game-footer i { display: inline-block; width: 19px; height: 1px; background: #65768b; margin: 0 7px; vertical-align: middle; }
+@media (max-width: 760px) {
+  .game-header { inset: 17px 5% auto; }
+  h1 { font-size: 25px; }
+  .game-title p { font-size: 9px; }
+  .weather-readout { font-size: 8px; letter-spacing: 1px; }
+  .weather-readout > span { display: none; }
+  .scene { width: 100vw; top: 36%; }
+  .location-caption { top: 80px; left: 5%; font-size: 8px; }
+  .moon { font-size: 15px; }
+  .scene-vignette { background: linear-gradient(#101d3033, transparent 20% 85%, #101d3055); }
+  .interaction-area { bottom: 43px; width: 87%; }
+  .dialogue { padding: 17px 18px; }
+  .dialogue h2 { font-size: 17px; }
+  .dialogue-identity { gap: 12px; }
+  .dialogue-identity > span { font-size: 6px; }
+  .spoken { font-size: 14px; }
+  .stage-direction { font-size: 10px; }
+  .replies { gap: 7px; flex-direction: column; }
+  .replies button { font-size: 10px; padding: 7px 0; }
+  .npc-label { padding: 4px 7px; }
+  .npc-label small { font-size: 8px; }
+  .game-footer { font-size: 6px; }
+  .cat-feedback { top: 83px; font-size: 10px; }
+}
+@media (max-height: 680px) {
+  .location-caption { display: none; }
+  .dialogue { padding: 12px 20px; }
+  .dialogue-identity { margin-bottom: 8px; }
+  .spoken { font-size: 14px; line-height: 1.45; margin-bottom: 5px; }
+  .stage-direction { font-size: 10px; margin-bottom: 5px; }
+  .replies { gap: 4px 16px; }
+  .interaction-area { bottom: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+@media (pointer: coarse) {
+  /* Larger invisible touch targets without scaling or moving the artwork. */
+  .npc::after { content: ''; position: absolute; inset: -9px; }
+  .close-dialogue { width: 36px; height: 36px; }
+}
+
+/* Chinese dialogue typography; no localization is painted over the scene. */
+.dialogue, .cat-feedback, .scene-invitation small {
+  font-family: 'Courier New', 'PingFang SC', 'Microsoft YaHei', monospace;
+}
+.dialogue-identity > span { font-size: 10px; letter-spacing: 1px; }

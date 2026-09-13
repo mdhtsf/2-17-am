@@ -1,0 +1,17 @@
+# After Hours — scene asset
+
+- File: `after-hours.png`, 1536 × 1024.
+- Created for this project using the built-in image_gen tool, not an API integration in the application.
+- The user-supplied visual reference guided atmosphere and composition. The project does not embed the reference screenshot or download game assets.
+- The final image includes Kai, Mira, and the cat. React only adds transparent interaction targets.
+- Original procedural assets remain in `public/art/` for reference; they are no longer rendered.
+- Hotspots and exterior rain regions are recorded in `src/data/scene.js`. Recalibrate them whenever replacing this image. The generation prompt alone does not determine final character positions.
+
+## Final generation prompt
+
+Use case: stylized-concept. Asset type: production background plate for an original interactive pixel-art narrative game called 2:17 AM.
+Use the attached reference ONLY for art quality, atmospheric lighting, and cutaway camera inspiration. Generate a new original full-bleed game scene, not a screenshot of a website. Landscape 1536x1024, 3:2 composition.
+A richly detailed Japanese urban midnight convenience store seen from a slightly elevated oblique isometric camera. Store interior occupies most of the frame; a street-facing tall glass wall and entry on the upper/right edges reveal cold navy rain, reflected distant city lights, and wet pavement. Cozy but lonely, 2:17 AM.
+Art direction: authentic meticulous hand-crafted pixel art with visible square pixel clusters, controlled palette, stepped silhouettes, sophisticated dithering, crisp readable sprites, no blurry painting, no smooth vector shapes, no simple procedural blocks, no 3D render. Match the reference's density and cinematic beauty. Rich varied snack packets, bottled drinks, coffee machine, paper cups, worn posters, tiny price tickets, checkout tools, floor tile scuffs, baskets, umbrella stand and a small plant. Amber pendant lamps and warm counter pool contrast with luminous pale-blue refrigerated doors and cool glass reflections. Uneven local lighting, deep soft colored shadows built from pixel clusters.
+Composition for interactive overlays: Kai, exactly one quiet dark-haired male clerk in muted blue work shirt and apron, naturally behind the LEFT checkout, visible head and upper body around x31%, y44%. Mira, exactly one tired graduate student with dark hair, muted navy cardigan and backpack, standing in the open aisle by the rear-right fridges around x58%, y46%, full body feet around y56%, clearly separated from shelves. Exactly one small cream-and-brown cat resting naturally on an unobstructed tile near checkout at x39%, y65%. Characters share the same pixel artistry and lighting as the world, no detached sprites. No other people or animals. Merchandise shelves in the midground and foreground create real depth without blocking the three characters. Keep all three comfortably within the central 70% width for responsive framing.
+Full image is art only. Absolutely NO HUD, NO title overlay, NO dialog panel, NO character labels, NO speech bubbles, NO hotspots, NO controls, NO WASD instructions, NO watermark. The UI will be rendered separately by React. Signs painted INTO the world may read only AFTER HOURS, OPEN, COFFEE or 24H. No real brands, especially no LAWSON logo. Keep lower 20% detailed but free of characters for a future dialogue overlay. Fill the corners with environment; avoid a floating isolated dollhouse on an empty background.
