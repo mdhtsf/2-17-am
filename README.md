@@ -66,14 +66,14 @@ Kai、Mira、猫已经绘入主图，因此不再叠加旧精灵、柜台前景�
 3. 按实际新图量取各角色矩形，换算为百分比：`x / 图片宽度 × 100`、`y / 图片高度 × 100`，宽高同理。
 4. 更新雨层区域，验证桌面与窄屏热区对齐。对话数据与状态逻辑无需更改。
 
-## Stage 2.1：Dialogue API Skeleton
+## Stage 2.2A：OpenRouter Real LLM Integration
 
 ```text
 DialoguePanel → fetch POST /api/chat → api/chat.js
                                       ↓
                               server/chat-handler.js（校验）
                                       ↓
-                              server/fake-reply.js（固定假回复）
+                              server/openrouter.js（真实模型回复）
 ```
 
 `api/chat.js` 是 Vercel Node.js Function，采用 Web Request / Response 接口。请求示例：
@@ -86,7 +86,11 @@ DialoguePanel → fetch POST /api/chat → api/chat.js
 
 history 只保存在 `App` 的 React state 中，按 Kai / Mira 分开保存最近 20 条消息（10 轮），刷新即消失。每次请求发送之前成功的完整 user / assistant 对话对，当前 message 单独传递；失败或取消的请求不写入 history。原 Stage 1 固定选项仍为本地反馈，不进入 API history。关闭面板会丢弃未发送草稿，保留已完成会话。
 
-未来 Stage 2.2 只需替换 `server/fake-reply.js` 的回复提供函数；该函数已经接收 npc、message 和 history。服务端人格提示与凭据应留在服务端，不放入公开的 `shared/` 或 `src/`。当前没有真实模型、密钥、数据库或长期 Memory。
+当前服务器端使用原生 fetch 调用 `https://openrouter.ai/api/v1/chat/completions`，模型固定为 `openrouter/free`。密钥仅从 `process.env.OPENROUTER_API_KEY` 读取；本地放在被 Git 忽略的 `.env.local` 中，不要使用 `VITE_` 前缀，也不要把密钥放入源码或提交到 Git。
+
+messages 是合法 history 加上当前 `{ role: 'user', content: message }`，尚无 system prompt。只读取 `choices[0].message.content`，并转换为 `{ reply }`；不转发原始 JSON、reasoning 或上游错误详情。请求明确关闭 streaming、排除 reasoning 输出，并限制为 512 个输出 token。服务端超时 45 秒，前端等待上限 60 秒。缺少环境变量返回 503，网络/上游/回复格式错误返回 502，超时返回 504；错误结构仍为 `{ error }`。
+
+Stage 2.2B 可在 `server/openrouter.js` 构造 messages 前，从服务端角色配置生成 system message（handler 已传入 npc）。当前有意不加入角色人格，也没有数据库或长期 Memory。参考 [OpenRouter API 文档](https://openrouter.ai/docs/quickstart) 与 [reasoning 输出控制](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)。
 
 ### 完整本地联调
 
@@ -107,20 +111,21 @@ curl -i http://localhost:3000/api/chat \
   -d '{"npc":"kai","message":"今晚忙吗？","history":[]}'
 ```
 
-预期返回 `{"reply":"夜班。总得有人醒着。"}`。将 npc 改为 mira 应返回论文相关的不同回复；随后在浏览器点击人物并连续发送两轮，检查 Network 中的 POST 和第二轮 history。
+预期返回 `{"reply":"模型生成的文本"}`。Kai / Mira 当前没有不同的角色 prompt，因此不保证回复风格有差异。在浏览器点击 Mira，发送“你好”，再发送“你还记得我刚才说了什么吗？”，随后测试 Kai 一轮，检查 Network 中的 POST 和第二轮 history。
 
 ### 已执行验证与边界
 
 ```sh
-node --test tests/chat.test.js
+node --test tests/chat.test.js tests/openrouter.test.js
 npm run build
 ```
 
-- API 的原生 Request / Response 单元测试：5 项通过，涵盖假回复、两轮记录、输入校验、方法和服务端异常。
-- `tests/dialogue.browser.js` 是供 Playwright `browser_run_code_unsafe` 执行的浏览器测试脚本，明确使用 HTTP mock。已验证输入、中文输入法、Loading、重复发送、两轮 history、角色隔离、错误重试、切换取消、猫反馈及桌面/窄屏面板边界。
-- 正常页面加载的浏览器 Console 无 error / warning；错误路径测试主动模拟了 HTTP 500。
+- API 与 OpenRouter 边界单元测试：12 项通过，涵盖两轮 messages、角色校验、缺少密钥、网络失败、非 2xx、无效 JSON、无效 content、超时及敏感详情不外传。测试 mock fetch，不读取 `.env.local`、不调用真实模型。
+- Stage 2.1 已执行的 `tests/dialogue.browser.js` 是供 Playwright `browser_run_code_unsafe` 执行的浏览器测试脚本，明确使用 HTTP mock。已验证输入、中文输入法、Loading、重复发送、两轮 history、角色隔离、错误重试、切换取消、猫反馈及桌面/窄屏面板边界。
+- Stage 2.1 浏览器验证时，正常页面 Console 无 error / warning；错误路径测试主动模拟了 HTTP 500。本轮按确认范围仅完成代码和服务端测试，未重新验证浏览器 Console。
 - Stage 1 主图、构图、热区位置、HUD 和雨层未修改；没有新增 npm 依赖。
-- **尚未执行 `vercel dev` 真实端到端联调**：本机没有 Vercel CLI 或项目关联。API 单元测试和前端 HTTP mock 不能替代这一步；前端 build 也不代表已验证 Vercel Function 运行环境。
+- Stage 2.2A 已直接调用实际 API handler 并请求 OpenRouter：Mira 两轮、Kai 一轮均为 200；Mira 第二轮正确回忆“你好”。测试日志仅输出状态和最终回复，没有输出原始上游 JSON / reasoning。
+- **Stage 2.2A 的浏览器 → Vercel Function → OpenRouter 完整联调仍待执行**。上述服务端真实测试及历史浏览器 HTTP mock 不能替代这一步。
 
 ## 当前美术边界
 

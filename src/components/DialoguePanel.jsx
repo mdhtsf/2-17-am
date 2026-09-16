@@ -25,7 +25,7 @@ export default function DialoguePanel({ character, history, onComplete, onClose 
     requestRef.current = controller // Immediate lock also covers rapid Enter presses.
     setLoading(true)
     setError('')
-    const timeout = setTimeout(() => controller.abort(), 15000)
+    const timeout = setTimeout(() => controller.abort(), 60000)
     try {
       const reply = await sendChat({ npc: character.id, message: text, history, signal: controller.signal })
       if (requestRef.current !== controller) return

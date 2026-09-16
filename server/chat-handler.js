@@ -1,5 +1,5 @@
 import { npcs, MAX_MESSAGE_LENGTH, MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
-import { replyToNpc } from './fake-reply.js'
+import { replyToNpc, DialogueServiceError } from './openrouter.js'
 
 function validHistory(history) {
   return Array.isArray(history) && history.length <= MAX_HISTORY_MESSAGES &&
@@ -46,7 +46,10 @@ export function createChatHandler(provider = replyToNpc) {
         throw new Error('Invalid provider reply')
       }
       return respond(200, { reply })
-    } catch {
+    } catch (error) {
+      if (error instanceof DialogueServiceError) {
+        return respond(error.status, { error: error.message })
+      }
       return respond(500, { error: '暂时没有听清，请稍后再试。' })
     }
   }

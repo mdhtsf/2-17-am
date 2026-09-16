@@ -19,13 +19,14 @@ async function call(body, method = 'POST', endpoint = handler.fetch) {
   }
 }
 
-test('NPC replies differ, and two complete turns are accepted', async () => {
-  const first = await call({ npc: 'kai', message: '你好', history: [] })
+test('injected provider receives NPCs and two complete turns are accepted', async () => {
+  const endpoint = createChatHandler(async ({ npc }) => npc.id === 'kai' ? '夜班。总得有人醒着。' : '论文还没写完。')
+  const first = await call({ npc: 'kai', message: '你好', history: [] }, 'POST', endpoint)
   assert.equal(first.status, 200)
   assert.equal(first.data.reply, '夜班。总得有人醒着。')
   const history = [{ role: 'user', content: '你好' }, { role: 'assistant', content: first.data.reply }]
-  assert.equal((await call({ npc: 'kai', message: '然后呢', history })).status, 200)
-  assert.notEqual((await call({ npc: 'mira', message: '你好' })).data.reply, first.data.reply)
+  assert.equal((await call({ npc: 'kai', message: '然后呢', history }, 'POST', endpoint)).status, 200)
+  assert.notEqual((await call({ npc: 'mira', message: '你好' }, 'POST', endpoint)).data.reply, first.data.reply)
 })
 
 test('rejects unsupported methods with Allow header', async () => {
