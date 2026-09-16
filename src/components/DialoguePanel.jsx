@@ -29,6 +29,7 @@ export default function DialoguePanel({ character, history, onComplete, onClose 
     try {
       const reply = await sendChat({ npc: character.id, message: text, history, signal: controller.signal })
       if (requestRef.current !== controller) return
+      if (controller.signal.aborted) throw new Error('Dialogue request aborted')
       onComplete(character.id, text, reply)
       setPreset(null)
       setMessage('')

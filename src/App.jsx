@@ -4,14 +4,20 @@ import DialoguePanel from './components/DialoguePanel'
 import { characters, catFeedback } from './data/characters'
 import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 import { useNpcStates } from './hooks/useNpcStates.js'
+import { applyNpcStateEvent } from './game/npcStateTransitions.js'
 
-export default function App() {
+export default function App({ onNpcStateChange } = {}) {
   const [selectedId, setSelectedId] = useState(null)
   const [catActive, setCatActive] = useState(false)
   const catTimer = useRef(null)
   const [histories, setHistories] = useState({ kai: [], mira: [] })
-  // Owned by App for the page lifetime; no gameplay transitions or dialogue use yet.
+  // Owned by App for the page lifetime; never included in dialogue API requests.
   const npcRuntime = useNpcStates()
+
+  // Read-only observer for the standalone development test fixture. No game UI.
+  useEffect(() => {
+    if (import.meta.env.DEV) onNpcStateChange?.(npcRuntime.npcStates)
+  }, [npcRuntime.npcStates, onNpcStateChange])
 
   function completeTurn(npc, message, reply) {
     setHistories(previous => ({
@@ -19,6 +25,7 @@ export default function App() {
       [npc]: [...previous[npc], { role: 'user', content: message },
         { role: 'assistant', content: reply }].slice(-MAX_HISTORY_MESSAGES),
     }))
+    npcRuntime.updateNpcState(npc, state => applyNpcStateEvent(npc, state, { type: 'dialogue_completed' }))
   }
 
   function closeDialogue() {

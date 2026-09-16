@@ -6,7 +6,7 @@ function requireNpc(states, npcId) {
   return states[npcId]
 }
 
-// Pure container operations only. Gameplay does not dispatch these in Stage 3.1.
+// Pure container operations only; gameplay rules live in the transition layer.
 export function npcStateReducer(states, action) {
   const previous = requireNpc(states, action.npcId)
   if (action.type === 'reset') {

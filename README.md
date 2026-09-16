@@ -232,6 +232,31 @@ Node 测试共 62 项通过：新增 7 项 state / API contract 测试，原有 
 
 本轮本地浏览器测试通过 `createServer({ envFile: false })` 禁用环境文件加载；构建使用临时配置继承原 `vite.config.js` 并设置 `envDir: false`，通过 `npm run build -- --config ...` 成功完成。没有读取或修改 `.env.local`，也没有改变项目 Vite 配置或新增依赖。
 
+## Stage 3.2：NPC State Transitions
+
+状态规则集中在 `src/game/npcStateTransitions.js` 的纯函数 `applyNpcStateEvent(npcId, currentState, event)` 中。目前只支持 `dialogue_completed`：首次成功对话将 `hasMetPlayer` 设为 `true`；每次成功对话让 `familiarity + 1`，用 `Math.min(currentState.familiarity + 1, 5)` 限制最大值为 5。函数不修改输入，不依赖 React、history、网络或存储；未知 event 原样返回当前 state，Cat / 未知 NPC 抛出与现有 state API 一致的 RangeError。
+
+`App.completeTurn()` 仍先按原逻辑写入 history，再通过 `updateNpcState()` 对本次 NPC 应用一次 `dialogue_completed`。规则没有放进组件或请求层。前端收到有效、未取消的 API 回复后才调用这个入口，不做 optimistic update。primary 失败但 fallback 成功时，前端只收到一个成功回复，因此只增加一次 familiarity。
+
+API 失败、两模型均失败、超时、取消、空白或过长输入、无效回复、尚未完成的请求都不会改变 state。打开、关闭、切换面板、Stage 1 固定选项和点击 Cat 也不会触发事件。补充了超时后的迟到回复检查：即使回复已缓冲，也不能在 signal 已取消后写入 history 或触发成功事件，仍使用现有错误提示。
+
+Kai / Mira 完全独立；例如 Kai 成功两次、Mira 成功一次，对应 familiarity 为 2 / 1。`trust`、`mood`、Mira 的 `deadlineStress` 不自动变化。state 继续只保存在当前页面的 React 内存中，刷新重置，不持久化。
+
+请求 body 仍然只有 `npc`、`message`、`history`。state 不发送给 `/api/chat`、OpenRouter、Character Prompt 或 system message，本阶段不会因为 familiarity 改变说话方式。state-aware dialogue 留待 Stage 3.3；没有加入语义分析、trust/mood 规则、关系 UI 或长期 memory。
+
+### Stage 3.2 验证
+
+```sh
+node --test tests/*.test.js
+npm run build
+```
+
+新增 `tests/npc-state-transitions.test.js`，验证首次成功、多轮累计、上限、隔离、其他字段不变、确定性、不修改输入及未知 event/NPC。使用真实 API handler 加 mock fetch 验证 primary 502 → fallback 成功只产生一个完成事件，以及两模型均失败不产生事件。原 Stage 2.3 fallback 和 Stage 3.1 state 测试保持通过。
+
+`tests/runtime.browser.html` 继续作为独立测试入口，测试实际 App 的 Kai 0→1→2 / Mira 0→1 流程、失败/重试/取消/超时及迟到回复、面板/固定选项/Cat 无副作用、熟悉度上限、history 完整性、刷新生命周期和 API payload。App 仅在开发模式接受可选只读 `onNpcStateChange` 观察回调，供测试读取冻结快照；正式游戏不提供该回调，不显示 debug UI，生产构建移除回调调用。
+
+本阶段 71 项 Node 测试、50 项 React/浏览器检查全部通过，Console 无 error/warning，`npm run build -- --config ...` 成功。验证不调用真实 OpenRouter，不读取或修改 `.env.local`。沿用 Stage 3.1 禁用环境文件加载的本地测试服务器和临时构建配置；未修改 Vite 配置或依赖。
+
 ## 当前美术边界
 
 场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。
