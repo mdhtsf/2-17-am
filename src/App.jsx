@@ -3,12 +3,15 @@ import ConvenienceStoreScene from './components/ConvenienceStoreScene'
 import DialoguePanel from './components/DialoguePanel'
 import { characters, catFeedback } from './data/characters'
 import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
+import { useNpcStates } from './hooks/useNpcStates.js'
 
 export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [catActive, setCatActive] = useState(false)
   const catTimer = useRef(null)
   const [histories, setHistories] = useState({ kai: [], mira: [] })
+  // Owned by App for the page lifetime; no gameplay transitions or dialogue use yet.
+  const npcRuntime = useNpcStates()
 
   function completeTurn(npc, message, reply) {
     setHistories(previous => ({

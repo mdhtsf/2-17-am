@@ -193,6 +193,45 @@ npm run build
 
 本阶段 Node 测试共 55 项通过，`npm run build` 成功。已有 `tests/dialogue.browser.js` 依赖旧 Playwright 工具的 `page.route`，当前浏览器接口不支持该 mock 能力，未重跑这一整套脚本；只复查了 Kai / Mira 面板打开、切换、关闭和猫反馈。没有执行真实 OpenRouter 自动测试。
 
+## Stage 3.1：NPC State Foundation
+
+NPC runtime state 是当前页面内的结构化角色状态容器，与 conversation history 独立。初始值集中在 `src/data/npcState.js`，通过 `createInitialNpcState()` 创建；每次调用都会生成独立对象，默认值和返回的快照只读，避免跨角色或跨 session 共享可变引用。当前字段都是基本类型。
+
+```js
+{
+  kai: { mood: 'neutral', familiarity: 0, trust: 0, hasMetPlayer: false },
+  mira: { mood: 'exhausted', familiarity: 0, trust: 0, hasMetPlayer: false, deadlineStress: 'high' }
+}
+```
+
+`src/hooks/useNpcStates.js` 使用 React `useReducer` 保存 `npcStates`，在 `App` 顶层实例化，生命周期与页面一致。切换 NPC 或关闭 DialoguePanel 不会卸载这个容器；刷新或重新挂载 App 后回到初始值。Cat 保持原有本地反馈，没有新增 state。没有数据库、localStorage 或其他持久化。
+
+hook 提供四个入口：
+
+- `npcStates`：以 NPC id 为键的只读快照。
+- `getNpcState(npcId)`：取得指定角色当前快照。
+- `updateNpcState(npcId, updater)`：updater 接收该角色最新只读 state，返回部分字段对象；合并时仅替换该角色，不覆盖另一个角色，批量更新也使用最新值。
+- `resetNpcState(npcId)`：仅将指定角色恢复为新建的初始快照。未知 NPC 会报错；updater 必须是返回对象的纯函数，不能直接修改快照。
+
+Stage 3.1 只提供这些容器操作，正式游戏没有调用 update/reset 的规则。测试中的 trust 增量仅验证更新机制，聊天、点击、关闭等事件不会自动改变 mood、trust、familiarity 或 hasMetPlayer。
+
+history 仍记录每个 NPC 最近 20 条 / 10 轮对话；runtime state 则保存角色属性，二者没有互相写入。state 不传给 DialoguePanel、`/api/chat`、OpenRouter 或 system message，不影响 NPC 回复、模型选择、fallback 和现有错误处理。游戏界面不显示任何 state 数值或 debug HUD。
+
+state transition rules 留待 Stage 3.2；state-aware dialogue 留待 Stage 3.3。本阶段没有实现这些后续能力或长期 memory。
+
+### Stage 3.1 验证
+
+```sh
+node --test tests/*.test.js
+npm run build
+```
+
+Node 测试共 62 项通过：新增 7 项 state / API contract 测试，原有 55 项（包括 Stage 2.3 fallback）继续通过。更新、reset、初始值、不可变快照、独立 session 和前端请求不携带 state 均已覆盖。所有请求测试均 mock fetch，未调用真实 OpenRouter。
+
+`tests/runtime.browser.html` 是独立的 React 浏览器测试页，仅用于验证，不进入生产构建。它在页面内 mock fetch，使用 React `act` 检查真实 hook 与 App，弥补旧浏览器脚本对 `page.route` 的依赖。26 项检查通过，包括批量 state 更新、选择/关闭后的保留、重新挂载重置、Kai/Mira 打开及切换、对话发送、输入法 Enter、loading 防重复、失败重试、取消请求、history 隔离及 20 条上限、猫反馈和无 debug UI；Console 无 error/warning。旧 `tests/dialogue.browser.js` 保留，未直接执行该旧脚本。
+
+本轮本地浏览器测试通过 `createServer({ envFile: false })` 禁用环境文件加载；构建使用临时配置继承原 `vite.config.js` 并设置 `envDir: false`，通过 `npm run build -- --config ...` 成功完成。没有读取或修改 `.env.local`，也没有改变项目 Vite 配置或新增依赖。
+
 ## 当前美术边界
 
 场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。
