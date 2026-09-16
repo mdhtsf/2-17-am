@@ -1,7 +1,6 @@
 import { getCharacterPrompt } from './characters.js'
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions'
-const MODEL = 'openrouter/free'
 
 // Only these curated messages may cross the server boundary, never upstream errors.
 export class DialogueServiceError extends Error {
@@ -28,13 +27,13 @@ export async function replyToNpc({ npc, message, history }) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: process.env.OPENROUTER_MODEL || 'openrouter/free',
         messages: [{ role: 'system', content: getCharacterPrompt(npc.id) },
           ...history.map(({ role, content }) => ({ role, content })),
           { role: 'user', content: message }],
         stream: false,
         max_tokens: 512,
-        reasoning: { enabled: false, exclude: true },
+        reasoning: { enabled: false },
       }),
       signal,
     })
@@ -51,7 +50,7 @@ export async function replyToNpc({ npc, message, history }) {
   }
 
   const reply = data?.choices?.[0]?.message?.content
-  // Some routed models put analysis/classification in content despite exclude=true.
+  // Some models put analysis/classification in content despite reasoning being disabled.
   // Reject recognizable non-dialogue output; never cut it into a partial sentence.
   const nonDialogue = typeof reply === 'string' &&
     /<\/?(?:think|analysis|reasoning)\b|^\s*(?:here(?:'s| is) (?:a |my |the )?(?:thinking process|analysis)|(?:user|response) safety\s*:|(?:思考过程|分析过程)\s*[:：]|这里玩家在问|按照角色设定)/im.test(reply)

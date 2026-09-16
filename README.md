@@ -86,13 +86,13 @@ DialoguePanel → fetch POST /api/chat → api/chat.js
 
 history 只保存在 `App` 的 React state 中，按 Kai / Mira 分开保存最近 20 条消息（10 轮），刷新即消失。每次请求发送之前成功的完整 user / assistant 对话对，当前 message 单独传递；失败或取消的请求不写入 history。原 Stage 1 固定选项仍为本地反馈，不进入 API history。关闭面板会丢弃未发送草稿，保留已完成会话。
 
-当前服务器端使用原生 fetch 调用 `https://openrouter.ai/api/v1/chat/completions`，模型固定为 `openrouter/free`。密钥仅从 `process.env.OPENROUTER_API_KEY` 读取；本地放在被 Git 忽略的 `.env.local` 中，不要使用 `VITE_` 前缀，也不要把密钥放入源码或提交到 Git。
+Stage 2.2B 的服务器端使用原生 fetch 调用 `https://openrouter.ai/api/v1/chat/completions`，当时模型固定为 `openrouter/free`。Stage 2.2C 的环境变量配置见后文独立章节。
 
-messages 按「服务端 system message → 当前 NPC 的合法 history → 当前 user message」构造，当前输入只追加一次。只读取 `choices[0].message.content`，并转换为 `{ reply }`；不转发原始 JSON、reasoning 或上游错误详情。请求明确关闭 streaming、排除 reasoning 输出，并限制为 512 token 的生成上限。服务端超时 45 秒，前端等待上限 60 秒。缺少环境变量返回 503，网络/上游/回复格式错误返回 502，超时返回 504；错误结构仍为 `{ error }`。
+messages 按「服务端 system message → 当前 NPC 的合法 history → 当前 user message」构造，当前输入只追加一次。只读取 `choices[0].message.content`，并转换为 `{ reply }`；不转发原始 JSON、reasoning 或上游错误详情。请求明确关闭 streaming，设置 `reasoning: { enabled: false }`，并保留 512 token 的生成上限。此上限为短对话留出余量，句数主要由已有角色 prompt 约束，不截断字符串。服务端超时 45 秒，前端等待上限 60 秒。缺少 API Key 返回 503，网络/上游/回复格式错误返回 502，超时返回 504；错误结构仍为 `{ error }`。
 
 角色约束集中在 `server/characters.js`：共用凌晨 2:17 雨夜便利店世界设定，再按 npc id 组合 Kai / Mira 的身份与口语风格。Kai 为安静、干冷幽默的年轻夜班店员，通常 1～3 句；Mira 为疲惫、自嘲、稍健谈的研究生，通常 2～4 句。句数通过 prompt 约束，保留 512 token 上限，不剪切回复字符串。共享的 id/name/role 仍在 `shared/npcs.js`；完整 prompt 不进入前端，客户端自带 systemPrompt 字段不参与请求构造，history 中的 system 角色会被拒绝。
 
-只返回 content，请求设置 reasoning.enabled=false 与 reasoning.exclude=true（是否能关闭取决于所路由模型的支持）。实测有路由模型把分析或分类文本写进 content，因此增加了针对明确 think/analysis 标记和安全分类前缀的最小校验；命中时沿用无效回复 502 与现有重试 UI，不把该轮写入 history。这不是全面的输出语义检测，无法保证随机模型每次遵守角色。没有数据库、关系系统或长期 Memory。参考 [OpenRouter API 文档](https://openrouter.ai/docs/quickstart) 与 [reasoning 输出控制](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)。
+只返回 content，请求设置 `reasoning: { enabled: false }`。实测有路由模型把分析或分类文本写进 content，因此增加了针对明确 think/analysis 标记和安全分类前缀的最小校验；命中时沿用无效回复 502 与现有重试 UI，不把该轮写入 history。这不是全面的输出语义检测，无法保证模型每次遵守角色。没有数据库、关系系统或长期 Memory。参考 [OpenRouter API 文档](https://openrouter.ai/docs/quickstart) 与 [reasoning 输出控制](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)。
 
 ### 完整本地联调
 
@@ -135,6 +135,28 @@ npm run build
 服务端调用实际 `/api/chat` handler → OpenRouter；不是 HTTP mock。Kai 的爱好回答围绕值夜和商品，困意回答为两句短话；Mira 出现论文 / deadline、熬困与电脑文档的处境。Kai、Mira 各自的“我叫西瓜”→“我叫什么”均成功；在告诉 Mira 姓名前，她回答不知道仅告诉 Kai 的名字，隔离测试通过。
 
 最后一轮固定 11 个问题中 10 个成功、1 个无效回复 502（Mira 的“为什么这么晚”）；之前该题重试曾返回论文 deadline 的回答。早期还遇到一次超时、分析正文和安全分类正文。已补强只输出台词的约束、reasoning 配置和最小异常校验，沿用原有错误 UI；不自动重试、不切换模型、不用固定回复冒充成功。Kai 一次身份回答偏刻薄，最后追加了“幽默不贬低玩家”的约束。补充约束后的两项定点复查均返回 200：Kai 自称夜班店员，Mira 回应论文 deadline；没有重复刻薄表达。角色语气仍需用户验收，不能把有限成功样本视为稳定性保证。
+
+## Stage 2.2C：Model Selection & Dialogue Quality
+
+当前服务器端使用原生 fetch 调用 `https://openrouter.ai/api/v1/chat/completions`，模型从服务端 `process.env.OPENROUTER_MODEL || "openrouter/free"` 读取；未设置或为空时使用 `openrouter/free`。密钥仅从 `process.env.OPENROUTER_API_KEY` 读取；本地放在被 Git 忽略的 `.env.local` 中，不要使用 `VITE_` 前缀，也不要把密钥放入源码或提交到 Git。
+
+OpenRouter 请求设置 `reasoning: { enabled: false }`，即 `reasoning.enabled = false`。`max_tokens` 保留为 512；短对话长度仍由 Stage 2.2B 的角色提示词约束，不截断字符串。Character Prompt、Kai / Mira personality、per-NPC history、DialoguePanel 和 API 契约保持不变。
+
+### 本地环境变量
+
+由开发者自行在 `.env.local` 配置以下变量（示例仅含占位密钥）：
+
+```dotenv
+OPENROUTER_API_KEY=your_key_here
+OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+```
+
+模型 ID 和密钥仅由服务端读取，不加 `VITE_` 前缀，不放入前端请求或 API 回复。修改后重启本地 API 服务；`.env.local` 已被 Git 忽略。本轮未读取或修改该文件，所选模型以开发者已有手动实测为依据。
+
+### Stage 2.2C 验证记录
+
+- API 与 OpenRouter 边界单元测试：15 项通过，涵盖模型环境变量选择、未设置/空值 fallback、客户端 model 不可覆盖、模型元数据不外传、reasoning 关闭、512 token 上限、服务端 system 选择、客户端 prompt 不可覆盖、两轮 messages、角色校验、缺少密钥、网络失败、非 2xx、无效 JSON、无效 content、超时及敏感详情不外传。测试 mock fetch，不读取 `.env.local`、不调用真实模型。
+- `npm run build` 通过。本阶段测试使用 mock，未调用真实模型；不包含任何真实 API Key。
 
 ## 当前美术边界
 
