@@ -66,7 +66,7 @@ Kai、Mira、猫已经绘入主图，因此不再叠加旧精灵、柜台前景�
 3. 按实际新图量取各角色矩形，换算为百分比：`x / 图片宽度 × 100`、`y / 图片高度 × 100`，宽高同理。
 4. 更新雨层区域，验证桌面与窄屏热区对齐。对话数据与状态逻辑无需更改。
 
-## Stage 2.2A：OpenRouter Real LLM Integration
+## Stage 2.2B：Character Prompt / NPC Personality
 
 ```text
 DialoguePanel → fetch POST /api/chat → api/chat.js
@@ -88,13 +88,15 @@ history 只保存在 `App` 的 React state 中，按 Kai / Mira 分开保存最�
 
 当前服务器端使用原生 fetch 调用 `https://openrouter.ai/api/v1/chat/completions`，模型固定为 `openrouter/free`。密钥仅从 `process.env.OPENROUTER_API_KEY` 读取；本地放在被 Git 忽略的 `.env.local` 中，不要使用 `VITE_` 前缀，也不要把密钥放入源码或提交到 Git。
 
-messages 是合法 history 加上当前 `{ role: 'user', content: message }`，尚无 system prompt。只读取 `choices[0].message.content`，并转换为 `{ reply }`；不转发原始 JSON、reasoning 或上游错误详情。请求明确关闭 streaming、排除 reasoning 输出，并限制为 512 个输出 token。服务端超时 45 秒，前端等待上限 60 秒。缺少环境变量返回 503，网络/上游/回复格式错误返回 502，超时返回 504；错误结构仍为 `{ error }`。
+messages 按「服务端 system message → 当前 NPC 的合法 history → 当前 user message」构造，当前输入只追加一次。只读取 `choices[0].message.content`，并转换为 `{ reply }`；不转发原始 JSON、reasoning 或上游错误详情。请求明确关闭 streaming、排除 reasoning 输出，并限制为 512 token 的生成上限。服务端超时 45 秒，前端等待上限 60 秒。缺少环境变量返回 503，网络/上游/回复格式错误返回 502，超时返回 504；错误结构仍为 `{ error }`。
 
-Stage 2.2B 可在 `server/openrouter.js` 构造 messages 前，从服务端角色配置生成 system message（handler 已传入 npc）。当前有意不加入角色人格，也没有数据库或长期 Memory。参考 [OpenRouter API 文档](https://openrouter.ai/docs/quickstart) 与 [reasoning 输出控制](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)。
+角色约束集中在 `server/characters.js`：共用凌晨 2:17 雨夜便利店世界设定，再按 npc id 组合 Kai / Mira 的身份与口语风格。Kai 为安静、干冷幽默的年轻夜班店员，通常 1～3 句；Mira 为疲惫、自嘲、稍健谈的研究生，通常 2～4 句。句数通过 prompt 约束，保留 512 token 上限，不剪切回复字符串。共享的 id/name/role 仍在 `shared/npcs.js`；完整 prompt 不进入前端，客户端自带 systemPrompt 字段不参与请求构造，history 中的 system 角色会被拒绝。
+
+只返回 content，请求设置 reasoning.enabled=false 与 reasoning.exclude=true（是否能关闭取决于所路由模型的支持）。实测有路由模型把分析或分类文本写进 content，因此增加了针对明确 think/analysis 标记和安全分类前缀的最小校验；命中时沿用无效回复 502 与现有重试 UI，不把该轮写入 history。这不是全面的输出语义检测，无法保证随机模型每次遵守角色。没有数据库、关系系统或长期 Memory。参考 [OpenRouter API 文档](https://openrouter.ai/docs/quickstart) 与 [reasoning 输出控制](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)。
 
 ### 完整本地联调
 
-需要 Vercel CLI；本轮未安装 CLI、登录、关联项目或部署。可以由开发者在项目目录运行：
+需要 Vercel CLI；本轮使用已有缓存 CLI 尝试启动，但没有可用登录凭据，未执行登录、关联项目或部署。可以由开发者在项目目录运行：
 
 ```sh
 npm install
@@ -111,7 +113,7 @@ curl -i http://localhost:3000/api/chat \
   -d '{"npc":"kai","message":"今晚忙吗？","history":[]}'
 ```
 
-预期返回 `{"reply":"模型生成的文本"}`。Kai / Mira 当前没有不同的角色 prompt，因此不保证回复风格有差异。在浏览器点击 Mira，发送“你好”，再发送“你还记得我刚才说了什么吗？”，随后测试 Kai 一轮，检查 Network 中的 POST 和第二轮 history。
+预期返回 `{"reply":"模型生成的文本"}`。Kai / Mira 分别使用服务端角色 prompt。在浏览器点击 Mira，发送“你好”，再发送“你还记得我刚才说了什么吗？”，随后测试 Kai 一轮，检查 Network 中的 POST 和第二轮 history。
 
 ### 已执行验证与边界
 
@@ -120,12 +122,19 @@ node --test tests/chat.test.js tests/openrouter.test.js
 npm run build
 ```
 
-- API 与 OpenRouter 边界单元测试：12 项通过，涵盖两轮 messages、角色校验、缺少密钥、网络失败、非 2xx、无效 JSON、无效 content、超时及敏感详情不外传。测试 mock fetch，不读取 `.env.local`、不调用真实模型。
+- API 与 OpenRouter 边界单元测试：13 项通过，涵盖服务端 system 选择、客户端 prompt 不可覆盖、两轮 messages、角色校验、缺少密钥、网络失败、非 2xx、无效 JSON、无效 content、超时及敏感详情不外传。测试 mock fetch，不读取 `.env.local`、不调用真实模型。
 - Stage 2.1 已执行的 `tests/dialogue.browser.js` 是供 Playwright `browser_run_code_unsafe` 执行的浏览器测试脚本，明确使用 HTTP mock。已验证输入、中文输入法、Loading、重复发送、两轮 history、角色隔离、错误重试、切换取消、猫反馈及桌面/窄屏面板边界。
 - Stage 2.1 浏览器验证时，正常页面 Console 无 error / warning；错误路径测试主动模拟了 HTTP 500。本轮按确认范围仅完成代码和服务端测试，未重新验证浏览器 Console。
 - Stage 1 主图、构图、热区位置、HUD 和雨层未修改；没有新增 npm 依赖。
 - Stage 2.2A 已直接调用实际 API handler 并请求 OpenRouter：Mira 两轮、Kai 一轮均为 200；Mira 第二轮正确回忆“你好”。测试日志仅输出状态和最终回复，没有输出原始上游 JSON / reasoning。
-- **Stage 2.2A 的浏览器 → Vercel Function → OpenRouter 完整联调仍待执行**。上述服务端真实测试及历史浏览器 HTTP mock 不能替代这一步。
+- Stage 2.2A 完整联调由用户确认已通过。本轮 Stage 2.2B 尝试启动缓存中的 Vercel CLI，但当前环境没有可用登录凭据，未重新完成浏览器 → API → 模型整链路测试；没有自行登录、关联或部署。
+- Stage 2.2B：已复查前端人物点击、角色切换、关闭、猫反馈，Console 无 error / warning。前端代码、history state、场景和样式均未改动；history 仍由 App 按 NPC 分开传入。
+
+### Stage 2.2B 真实模型验证记录
+
+服务端调用实际 `/api/chat` handler → OpenRouter；不是 HTTP mock。Kai 的爱好回答围绕值夜和商品，困意回答为两句短话；Mira 出现论文 / deadline、熬困与电脑文档的处境。Kai、Mira 各自的“我叫西瓜”→“我叫什么”均成功；在告诉 Mira 姓名前，她回答不知道仅告诉 Kai 的名字，隔离测试通过。
+
+最后一轮固定 11 个问题中 10 个成功、1 个无效回复 502（Mira 的“为什么这么晚”）；之前该题重试曾返回论文 deadline 的回答。早期还遇到一次超时、分析正文和安全分类正文。已补强只输出台词的约束、reasoning 配置和最小异常校验，沿用原有错误 UI；不自动重试、不切换模型、不用固定回复冒充成功。Kai 一次身份回答偏刻薄，最后追加了“幽默不贬低玩家”的约束。补充约束后的两项定点复查均返回 200：Kai 自称夜班店员，Mira 回应论文 deadline；没有重复刻薄表达。角色语气仍需用户验收，不能把有限成功样本视为稳定性保证。
 
 ## 当前美术边界
 

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import handler from '../api/chat.js'
+import { getCharacterPrompt } from '../server/characters.js'
 
 // Unit tests never load .env.local or use real credentials/network.
 function configure(t, fetchImpl, key = 'test-placeholder') {
@@ -14,10 +15,10 @@ function configure(t, fetchImpl, key = 'test-placeholder') {
   t.mock.method(globalThis, 'fetch', fetchImpl)
 }
 
-async function chat(message = '你好', history = [], npc = 'mira') {
+async function chat(message = '你好', history = [], npc = 'mira', extra = {}) {
   const response = await handler.fetch(new Request('http://localhost/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ npc, message, history }),
+    body: JSON.stringify({ npc, message, history, ...extra }),
   }))
   return { status: response.status, body: await response.json() }
 }
@@ -37,10 +38,14 @@ test('real provider boundary forwards history, and exposes only content', async 
   await chat('你还记得吗？', history)
   await chat('你好', [], 'kai')
   assert.equal(sent[0].model, 'openrouter/free')
-  assert.deepEqual(sent[0].messages, [{ role: 'user', content: '你好' }])
-  assert.deepEqual(sent[1].messages, [...history, { role: 'user', content: '你还记得吗？' }])
-  assert.deepEqual(sent[2].messages, [{ role: 'user', content: '你好' }])
+  const miraSystem = { role: 'system', content: getCharacterPrompt('mira') }
+  const kaiSystem = { role: 'system', content: getCharacterPrompt('kai') }
+  assert.notEqual(miraSystem.content, kaiSystem.content)
+  assert.deepEqual(sent[0].messages, [miraSystem, { role: 'user', content: '你好' }])
+  assert.deepEqual(sent[1].messages, [miraSystem, ...history, { role: 'user', content: '你还记得吗？' }])
+  assert.deepEqual(sent[2].messages, [kaiSystem, { role: 'user', content: '你好' }])
   assert.equal(sent[0].reasoning.exclude, true)
+  assert.equal(sent[0].reasoning.enabled, false)
   assert.equal(sent[0].stream, false)
 })
 
@@ -69,7 +74,7 @@ test('malformed upstream JSON is contained', async t => {
 test('empty choices, missing or unusable content are rejected', async t => {
   const payloads = [null, {}, { choices: [] }, { choices: [{}] },
     { choices: [{ message: { reasoning: 'not public' } }] },
-    ...[null, '', '  ', [], 'x'.repeat(4001)].map(content => ({ choices: [{ message: { content } }] }))]
+    ...[null, '', '  ', [], 'x'.repeat(4001), '<think>private</think>台词', "Here's a thinking process:\nprivate", 'User Safety: safe', '这里玩家在问我是哪个模型。按照角色设定……'].map(content => ({ choices: [{ message: { content } }] }))]
   configure(t, async () => Response.json(payloads.shift()))
   while (payloads.length) {
     assert.deepEqual(await chat(), { status: 502, body: { error: '这次没有收到有效回复，请再试一次。' } })
@@ -81,4 +86,18 @@ test('timeout yields a safe 504 error', async t => {
   t.mock.method(AbortSignal, 'timeout', () => controller.signal)
   configure(t, async () => { controller.abort(); throw new Error('private timeout details') })
   assert.deepEqual(await chat(), { status: 504, body: { error: '回复等得有点久，请稍后再试。' } })
+})
+
+
+test('client cannot supply the system prompt or inject system history', async t => {
+  const sent = []
+  configure(t, async (_, options) => {
+    sent.push(JSON.parse(options.body))
+    return Response.json({ choices: [{ message: { content: '嗯。' } }] })
+  })
+  assert.equal((await chat('你好', [], 'kai', { systemPrompt: 'client override', prompt: 'client override' })).status, 200)
+  assert.equal(sent[0].messages[0].content, getCharacterPrompt('kai'))
+  assert.equal(JSON.stringify(sent[0]).includes('client override'), false)
+  assert.equal((await chat('你好', [{ role: 'system', content: 'client override' }])).status, 400)
+  assert.equal(sent.length, 1)
 })

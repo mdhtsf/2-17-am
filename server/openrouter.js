@@ -1,3 +1,5 @@
+import { getCharacterPrompt } from './characters.js'
+
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions'
 const MODEL = 'openrouter/free'
 
@@ -9,7 +11,7 @@ export class DialogueServiceError extends Error {
   }
 }
 
-export async function replyToNpc({ message, history }) {
+export async function replyToNpc({ npc, message, history }) {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     throw new DialogueServiceError(503, '对话服务尚未配置，请设置服务器环境变量 OPENROUTER_API_KEY。')
@@ -27,11 +29,12 @@ export async function replyToNpc({ message, history }) {
       },
       body: JSON.stringify({
         model: MODEL,
-        messages: [...history.map(({ role, content }) => ({ role, content })),
+        messages: [{ role: 'system', content: getCharacterPrompt(npc.id) },
+          ...history.map(({ role, content }) => ({ role, content })),
           { role: 'user', content: message }],
         stream: false,
         max_tokens: 512,
-        reasoning: { exclude: true },
+        reasoning: { enabled: false, exclude: true },
       }),
       signal,
     })
@@ -48,7 +51,11 @@ export async function replyToNpc({ message, history }) {
   }
 
   const reply = data?.choices?.[0]?.message?.content
-  if (typeof reply !== 'string' || !reply.trim() || reply.length > 4000) {
+  // Some routed models put analysis/classification in content despite exclude=true.
+  // Reject recognizable non-dialogue output; never cut it into a partial sentence.
+  const nonDialogue = typeof reply === 'string' &&
+    /<\/?(?:think|analysis|reasoning)\b|^\s*(?:here(?:'s| is) (?:a |my |the )?(?:thinking process|analysis)|(?:user|response) safety\s*:|(?:思考过程|分析过程)\s*[:：]|这里玩家在问|按照角色设定)/im.test(reply)
+  if (typeof reply !== 'string' || !reply.trim() || reply.length > 4000 || nonDialogue) {
     throw new DialogueServiceError(502, '这次没有收到有效回复，请再试一次。')
   }
   // No provider metadata, reasoning, or raw JSON is returned to the game.
