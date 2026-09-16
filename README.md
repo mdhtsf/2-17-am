@@ -158,6 +158,41 @@ OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free
 - API 与 OpenRouter 边界单元测试：15 项通过，涵盖模型环境变量选择、未设置/空值 fallback、客户端 model 不可覆盖、模型元数据不外传、reasoning 关闭、512 token 上限、服务端 system 选择、客户端 prompt 不可覆盖、两轮 messages、角色校验、缺少密钥、网络失败、非 2xx、无效 JSON、无效 content、超时及敏感详情不外传。测试 mock fetch，不读取 `.env.local`、不调用真实模型。
 - `npm run build` 通过。本阶段测试使用 mock，未调用真实模型；不包含任何真实 API Key。
 
+## Stage 2.3：Dialogue Reliability & Fallback
+
+主模型读取 `process.env.OPENROUTER_MODEL || "openrouter/free"`，备用模型读取 `process.env.OPENROUTER_FALLBACK_MODEL || null`。备用模型未配置、为空或与主模型相同时，不额外请求。由开发者自行在 `.env.local` 配置并重启 API 服务：
+
+```dotenv
+OPENROUTER_API_KEY=your_key_here
+OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+OPENROUTER_FALLBACK_MODEL=nvidia/nemotron-3.5-lightning:free
+```
+
+示例不包含真实 API Key。两个模型配置和密钥均只在服务端使用；本阶段不读取或修改 `.env.local`，该文件继续被 Git 忽略。
+
+`server/openrouter.js` 只构造一次 Character Prompt、当前 NPC 的 history 和当前 message：先请求 primary；成功立即返回；明确的临时故障立即请求 fallback 一次。不重试 primary，不循环切换。两次请求仅 model 不同，`reasoning: { enabled: false }`、`max_tokens: 512`、非 streaming 和其他配置一致。两次请求共用原有 45 秒总时限；总时限耗尽后返回现有 504，不再启动 fallback，前端 60 秒等待上限不变。
+
+切换条件：
+
+- HTTP 502 / 503 / 504，以及可识别的临时 fetch / 网络连接故障。
+- HTTP 429：只有 `error.metadata.limit_source` 明确为 `upstream_provider_shared_pool`、`provider_overloaded` 或 `provider_temporary_rate_limit` 才切换。如果没有 limit_source，仅接受明确的 `provider_overloaded`、`provider_unavailable`、`provider_temporary_rate_limit` error_type；不会仅凭 provider 名称或泛化的 rate limit 文本推断。
+- HTTP 500 / 529 也必须携带上述明确的临时 provider 分类；普通 500 不切换。HTTP 200 响应内的显式 `error.code` 使用相同规则，兼容生成过程中上游报告的错误。错误响应格式参考 [OpenRouter 错误文档](https://openrouter.ai/docs/api_reference/errors-and-debugging)；metadata 不足时保守地不切换。
+
+不切换：400 / 401 / 402 / 403 / 404、缺少密钥、本地配置或校验错误、不可识别的程序异常、账户限流、每日免费额度或 quota 耗尽、来源不明的 429。明确的未知或账户级 limit_source 优先于其他 provider 提示，BYOK 限流不切换。无效 JSON、空回复或分析正文不作为切换理由，继续沿用原来的安全错误处理。
+
+两次均失败时只返回现有友好 `{ error }`。成功始终只返回 `{ reply }`；前端不知道模型切换，不接收模型名称、provider metadata、reasoning 或原始错误内容。角色提示词、每个 NPC 独立的最近 20 条 / 10 轮 history、DialoguePanel、loading / retry 和 Stage 1 场景保持不变。
+
+### Stage 2.3 验证
+
+```sh
+node --test tests/*.test.js
+npm run build
+```
+
+自动测试全部 mock fetch，不读取本地凭据、不调用真实 OpenRouter。覆盖主模型一次成功、502/503/504 切换、provider 与账户 429 区分、认证和配置错误不切换、两次均失败、上下文完整性、客户端无法覆盖模型、reasoning / token 配置，以及共用超时预算。
+
+本阶段 Node 测试共 55 项通过，`npm run build` 成功。已有 `tests/dialogue.browser.js` 依赖旧 Playwright 工具的 `page.route`，当前浏览器接口不支持该 mock 能力，未重跑这一整套脚本；只复查了 Kai / Mira 面板打开、切换、关闭和猫反馈。没有执行真实 OpenRouter 自动测试。
+
 ## 当前美术边界
 
 场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。
