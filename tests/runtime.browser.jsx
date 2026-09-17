@@ -25,6 +25,7 @@ function RuntimeHarness() {
 }
 
 const requests = []
+const preRequestStates = []
 let mode = 'success'
 let pending
 let observedStates
@@ -48,6 +49,7 @@ window.fetch = async (url, options) => {
   if (url !== '/api/chat') throw new Error('Unexpected test request')
   const body = JSON.parse(options.body)
   requests.push(body)
+  preRequestStates.push(structuredClone(observedStates[body.npc]))
   const result = () => Response.json({ reply: `${body.npc}: ${body.message}` })
   if (mode === 'deferred') return new Promise(resolve => { pending = () => resolve(result()) })
   if (mode === 'timeout') return new Promise((_, reject) => {
@@ -106,19 +108,23 @@ try {
   await submit()
   check(requests.length === 1 && container.querySelector('[aria-label="发送"]').disabled, 'loading prevents duplicate requests')
   checkState(0, 0, 'pending and duplicate submission do not update state')
+  check(requests[0].npcState.familiarity === 0 && requests[0].npcState.hasMetPlayer === false, 'first Kai request sends stranger state before completion')
   await act(async () => pending())
   check(spoken() === 'kai: 今晚忙吗？', 'mock reply is displayed')
   checkState(1, 0, 'first successful reply marks Kai met and increments once')
+  check(requests[0].npcState.familiarity === 0, 'successful transition cannot mutate an already sent state snapshot')
   mode = 'success'
   await say('我叫西瓜。')
   check(requests[1].history.length === 2 && requests[1].history[0].role === 'user', 'second turn sends the prior conversation')
   checkState(2, 0, 'second success increments only Kai')
+  check(requests[1].npcState.familiarity === 1 && requests[1].npcState.hasMetPlayer === true, 'second Kai request uses recognized pre-turn state')
   await click('.npc-mira')
   check(spoken() === '你看起来也没怎么睡。', 'Mira panel opens normally')
   checkState(2, 0, 'switching to Mira preserves Kai and leaves Mira unmet')
   await say('论文怎么样？')
   check(requests[2].npc === 'mira' && requests[2].history.length === 0, 'Mira does not receive Kai history')
   checkState(2, 1, 'Mira first success updates only Mira')
+  check(requests[2].npcState.familiarity === 0 && requests[2].npcState.deadlineStress === 'high', 'Mira sends her own stranger state independently')
   mode = 'error'
   await say('还要多久？')
   check(Boolean(container.querySelector('[role="alert"]')) && container.querySelector('input').value === '还要多久？', 'failure preserves draft and shows retry feedback')
@@ -128,6 +134,7 @@ try {
   await submit()
   check(requests[3].history.length === 2 && requests[4].history.length === 2, 'retry does not include a failed turn')
   checkState(2, 2, 'successful retry increments once')
+  check(requests[3].npcState.familiarity === 1 && requests[4].npcState.familiarity === 1, 'failed turn and retry use the same pre-turn state')
   await click('.npc-kai')
   check(spoken() === 'kai: 我叫西瓜。', 'returning to Kai preserves his conversation')
   checkState(2, 2, 'switching back preserves both states')
@@ -162,11 +169,21 @@ try {
   for (let index = 0; index < 10; index++) await say(`第 ${index} 句`)
   checkState(5, 2, 'familiarity caps at 5 without changing mood, trust or deadline stress')
   check(requests.at(-1).history.length === 20, 'history remains capped at 20 messages')
-  check(requests.every(request => Object.keys(request).sort().join(',') === 'history,message,npc'), 'requests contain only npc, message and history')
+  check(requests.filter(request => request.message.startsWith('第 ')).slice(0, 4).map(request => request.npcState.familiarity).join(',') === '2,3,4,5', 'Kai requests enter familiar tier only on the next turn')
+  await click('.npc-mira')
+  await say('再聊一会儿')
+  check(requests.at(-1).npcState.familiarity === 2, 'Mira stays recognized for the turn that raises her to familiar')
+  await say('接着刚才的话')
+  check(requests.at(-1).npcState.familiarity === 3, 'Mira next request independently uses familiar state')
+  checkState(5, 4, 'familiar dialogue keeps both NPC states isolated')
+  check(requests.every(request => Object.keys(request).sort().join(',') === 'history,message,npc,npcState'), 'requests contain only npc, message, history and current npcState')
+  check(requests.every((request, index) => JSON.stringify(request.npcState) === JSON.stringify(preRequestStates[index])), 'every request uses its own pre-turn state snapshot')
+  check(requests.every(request => Object.keys(request.npcState).sort().join(',') === Object.keys(createInitialNpcState()[request.npc]).sort().join(',')), 'Kai requests never carry Mira state or a combined state map')
+  check(requests.every(request => request.history.every(entry => (entry.role === 'user' || entry.role === 'assistant') && Object.keys(entry).sort().join(',') === 'content,role')), 'history never contains system messages or state context')
   check(!/trust|familiarity|deadlineStress|hasMetPlayer|exhausted|neutral/.test(container.textContent), 'game has no runtime debug UI')
   await click('.npc-cat')
   check(container.querySelector('.cat-feedback').textContent.includes('没什么意思'), 'Cat keeps local feedback')
-  checkState(5, 2, 'Cat does not change NPC state')
+  checkState(5, 4, 'Cat does not change NPC state')
   await act(async () => root.render(<App key="new-page-session" onNpcStateChange={observeState} />))
   checkState(0, 0, 'new App lifetime resets encounter and familiarity')
   await click('.npc-kai')

@@ -11,7 +11,7 @@ export default function App({ onNpcStateChange } = {}) {
   const [catActive, setCatActive] = useState(false)
   const catTimer = useRef(null)
   const [histories, setHistories] = useState({ kai: [], mira: [] })
-  // Owned by App for the page lifetime; never included in dialogue API requests.
+  // Owned by App; only the selected NPC's pre-turn snapshot enters a request.
   const npcRuntime = useNpcStates()
 
   // Read-only observer for the standalone development test fixture. No game UI.
@@ -59,7 +59,7 @@ export default function App({ onNpcStateChange } = {}) {
       <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} />
       <div className="interaction-area">
         {selectedId
-          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} onComplete={completeTurn} onClose={closeDialogue} />
+          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} npcState={npcRuntime.getNpcState(selectedId)} onComplete={completeTurn} onClose={closeDialogue} />
           : <div className="scene-invitation"><span>· · ·</span><p>No rush. The rain isn’t going anywhere.</p><small>点击角色，聊上几句</small></div>}
       </div>
     </div>

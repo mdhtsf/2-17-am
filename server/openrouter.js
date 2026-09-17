@@ -1,4 +1,5 @@
 import { getCharacterPrompt } from './characters.js'
+import { buildNpcStateContext } from './npc-state-context.js'
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions'
 
@@ -84,7 +85,7 @@ async function requestModel(model, generation, apiKey, signal) {
   return reply.trim()
 }
 
-export async function replyToNpc({ npc, message, history }) {
+export async function replyToNpc({ npc, message, history, npcState }) {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     throw new DialogueServiceError(503, '对话服务尚未配置，请设置服务器环境变量 OPENROUTER_API_KEY。')
@@ -93,6 +94,7 @@ export async function replyToNpc({ npc, message, history }) {
   const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL || null
   const generation = {
     messages: [{ role: 'system', content: getCharacterPrompt(npc.id) },
+      { role: 'system', content: buildNpcStateContext(npc.id, npcState) },
       ...history.map(({ role, content }) => ({ role, content })),
       { role: 'user', content: message }],
     stream: false,

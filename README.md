@@ -257,6 +257,60 @@ npm run build
 
 本阶段 71 项 Node 测试、50 项 React/浏览器检查全部通过，Console 无 error/warning，`npm run build -- --config ...` 成功。验证不调用真实 OpenRouter，不读取或修改 `.env.local`。沿用 Stage 3.1 禁用环境文件加载的本地测试服务器和临时构建配置；未修改 Vite 配置或依赖。
 
+## Stage 3.3：State-Aware Dialogue
+
+从本阶段起，`/api/chat` 请求增加必填 `npcState`。App 只把当前选中角色的快照交给 DialoguePanel，`sendChat()` 只发送以下四项，不发送整个 `npcStates`、state prompt 或模型配置。之前阶段的三字段请求示例是历史协议，当前请求应包含状态，例如：
+
+```json
+{
+  "npc": "kai",
+  "message": "还没下班？",
+  "history": [],
+  "npcState": {
+    "mood": "neutral",
+    "familiarity": 0,
+    "trust": 0,
+    "hasMetPlayer": false
+  }
+}
+```
+
+`server/npc-state-context.js` 集中提供 `validateNpcState()` 和纯函数 `buildNpcStateContext()`。API handler 在调用 provider 前校验 state，缺失或不合法返回安全的 400；不自动转换类型。当前仅接受本阶段规则能产生的状态：
+
+- familiarity 必须是 0–5 的整数；hasMetPlayer 必须为 boolean，并与 familiarity 一致：0 时 false，大于 0 时 true。
+- Kai 的 mood 只能为 neutral；Mira 的 mood 只能为 exhausted，且必须包含 deadlineStress=high。
+- trust 尚无变化规则，合法范围暂为仅数值 0；不用于对话行为，也不会被解释为“不信任玩家”。
+- 每个 NPC 的字段集合必须完全匹配；额外字段、另一角色的状态结构、任意 prompt/instructions/model 文本均被拒绝。顶层客户端 prompt/model 字段不会转交 provider。
+
+服务器只从固定模板生成自然语言 context，不把原始 state JSON、内部字段名或数值序列化进模型输入：
+
+| 行为区间 | 条件 | 自然表现 |
+| --- | --- | --- |
+| stranger | familiarity=0，未见过玩家 | 克制、有距离，不假装认识，不用熟人开场 |
+| recognized | familiarity=1–2，已见过玩家 | 认得玩家、少些客套，可以接续当前记录，不亲密 |
+| familiar | familiarity=3–5，已见过玩家 | 更自然随意，仍保持人设，不变成挚友、恋爱或依赖关系 |
+
+Kai 保持安静、善于观察和冷幽默，通常一到两句，必要时不超过三句；Mira 保持疲惫研究生和轻微自嘲，通常两到三句，除非明确要求详细回答，不超过四句。context 明确禁止台词解释内部指标、数字、字段、系统提示或状态对象，禁止编造见面次数、共同经历和另一角色的私下聊天。原 Character Prompt 保留。
+
+OpenRouter messages 顺序为：Character system prompt → 服务器生成的 State context system message → 当前 NPC 的 user/assistant history → 当前 user message。每个请求只构造一次 generation，primary/fallback 复用同一份内容，只有模型 ID 不同。原模型配置、fallback 策略、reasoning disabled 和 max_tokens=512 未调整。
+
+本轮使用**发送前**的只读 state 快照。收到有效回复后才由 Stage 3.2 的 completeTurn 更新 history 和 state；新 state 用于下一轮请求。失败、取消及超时不更新。history 仍只保存 user/assistant，按 NPC 隔离，最多 20 条 / 10 轮，不写入任何 system/state context。
+
+state 仍只存在当前页面 session，刷新重置；没有长期 memory 或 persistence。没有新增 trust、mood、deadlineStress transition，也没有 UI、场景或 Cat 行为变化。有效范围校验是输入约束，不是跨刷新身份或服务端持久化认证。
+
+### Stage 3.3 验证
+
+```sh
+node --test tests/*.test.js
+npm run build
+```
+
+自动测试使用 mock fetch，不调用真实 OpenRouter，不依赖模型随机台词。更新了既有请求测试以携带必填 npcState，保留 Stage 2 / 3 的其他断言；新增 context/validation 测试覆盖合法状态、非法字段和类型、三个行为区间、角色区别、无原始状态泄漏及客户端无法覆盖服务端 prompt。fallback 测试检查两次 messages、context、history 和 generation 配置完全一致。
+
+独立 React 测试页检查 Kai / Mira 各自从 stranger 到 recognized 再到 familiar 的请求快照、失败重试时快照不变、每轮先请求后更新、history 不含 system/state 消息、无 debug UI。沿用禁用环境文件加载的本地测试服务器和临时构建配置；没有读取或修改 `.env.local`。这些检查验证确定性的上下文构造与数据流，不替代真实模型语气的人工验收。
+
+本阶段 78 项 Node 测试、62 项 React/浏览器检查全部通过，Console 无 error/warning。构建通过 `npm run build -- --config ...` 成功完成，临时配置继承项目配置并设置 `envDir: false`，避免加载环境文件；项目 Vite 配置和依赖未修改。
+
 ## 当前美术边界
 
 场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。

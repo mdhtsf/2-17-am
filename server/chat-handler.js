@@ -1,5 +1,6 @@
 import { npcs, MAX_MESSAGE_LENGTH, MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 import { replyToNpc, DialogueServiceError } from './openrouter.js'
+import { validateNpcState } from './npc-state-context.js'
 
 function validHistory(history) {
   return Array.isArray(history) && history.length <= MAX_HISTORY_MESSAGES &&
@@ -38,9 +39,12 @@ export function createChatHandler(provider = replyToNpc) {
       if (!validHistory(history)) {
         return respond(400, { error: '对话记录格式不正确。' })
       }
+      const npcState = validateNpcState(npc, body.npcState)
+      if (!npcState) return respond(400, { error: '角色状态格式不正确。' })
       const reply = await provider({
         npc: npcs[npc], message: message.trim(),
         history: history.map(({ role, content }) => ({ role, content })),
+        npcState,
       })
       if (typeof reply !== 'string' || !reply.trim() || reply.length > 4000) {
         throw new Error('Invalid provider reply')

@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import handler from '../api/chat.js'
 import { getCharacterPrompt } from '../server/characters.js'
+import { buildNpcStateContext } from '../server/npc-state-context.js'
+import { createInitialNpcState } from '../src/data/npcState.js'
 
 // Unit tests never load .env.local or use real credentials/network.
 function configure(t, fetchImpl, key = 'test-placeholder', model, fallbackModel) {
@@ -28,7 +30,7 @@ function configure(t, fetchImpl, key = 'test-placeholder', model, fallbackModel)
 async function chat(message = '你好', history = [], npc = 'mira', extra = {}) {
   const response = await handler.fetch(new Request('http://localhost/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ npc, message, history, ...extra }),
+    body: JSON.stringify({ npc, message, history, npcState: createInitialNpcState()[npc], ...extra }),
   }))
   return { status: response.status, body: await response.json() }
 }
@@ -45,15 +47,20 @@ test('real provider boundary forwards history, and exposes only content', async 
   const first = await chat()
   assert.deepEqual(first, { status: 200, body: { reply: '收到' } })
   const history = [{ role: 'user', content: '你好' }, { role: 'assistant', content: first.body.reply }]
-  await chat('你还记得吗？', history)
+  const recognizedMira = { ...createInitialNpcState().mira, familiarity: 1, hasMetPlayer: true }
+  await chat('你还记得吗？', history, 'mira', { npcState: recognizedMira })
   await chat('你好', [], 'kai')
   assert.equal(sent[0].model, 'openrouter/free')
   const miraSystem = { role: 'system', content: getCharacterPrompt('mira') }
   const kaiSystem = { role: 'system', content: getCharacterPrompt('kai') }
+  const miraContext = { role: 'system', content: buildNpcStateContext('mira', createInitialNpcState().mira) }
+  const kaiContext = { role: 'system', content: buildNpcStateContext('kai', createInitialNpcState().kai) }
   assert.notEqual(miraSystem.content, kaiSystem.content)
-  assert.deepEqual(sent[0].messages, [miraSystem, { role: 'user', content: '你好' }])
-  assert.deepEqual(sent[1].messages, [miraSystem, ...history, { role: 'user', content: '你还记得吗？' }])
-  assert.deepEqual(sent[2].messages, [kaiSystem, { role: 'user', content: '你好' }])
+  assert.deepEqual(sent[0].messages, [miraSystem, miraContext, { role: 'user', content: '你好' }])
+  assert.deepEqual(sent[1].messages, [miraSystem,
+    { role: 'system', content: buildNpcStateContext('mira', recognizedMira) },
+    ...history, { role: 'user', content: '你还记得吗？' }])
+  assert.deepEqual(sent[2].messages, [kaiSystem, kaiContext, { role: 'user', content: '你好' }])
   assert.deepEqual(sent[0].reasoning, { enabled: false })
   assert.equal(sent[0].max_tokens, 512)
   assert.equal(sent[0].stream, false)
@@ -159,16 +166,19 @@ for (const status of [502, 503, 504]) {
           ? Response.json({ error: { message: 'private provider unavailable' } }, { status }) : success()
       }, 'test-placeholder', primaryModel, fallbackModel)
       const history = [{ role: 'user', content: '我叫西瓜。' }, { role: 'assistant', content: '记住了。' }]
-      const result = await chat('我叫什么？', history, npc, { model: 'client-primary', fallbackModel: 'client-fallback' })
+      const npcState = { ...createInitialNpcState()[npc], familiarity: 3, hasMetPlayer: true }
+      const result = await chat('我叫什么？', history, npc, { npcState, model: 'client-primary', fallbackModel: 'client-fallback', stateContext: 'client-state-prompt' })
       assert.deepEqual(result, { status: 200, body: { reply: '还醒着。' } })
       assert.deepEqual(sent.map(request => request.model), [primaryModel, fallbackModel])
       const { model: firstModel, ...first } = sent[0]
       const { model: secondModel, ...second } = sent[1]
       assert.deepEqual(second, first)
       assert.deepEqual(second.messages, [
-        { role: 'system', content: getCharacterPrompt(npc) }, ...history,
+        { role: 'system', content: getCharacterPrompt(npc) },
+        { role: 'system', content: buildNpcStateContext(npc, npcState) }, ...history,
         { role: 'user', content: '我叫什么？' },
       ])
+      assert.equal(JSON.stringify(second).includes('client-state-prompt'), false)
       assert.deepEqual(second.reasoning, { enabled: false })
       assert.equal(second.max_tokens, 512)
       assert.equal(second.stream, false)

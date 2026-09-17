@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { sendChat } from '../lib/chat'
 import { MAX_MESSAGE_LENGTH } from '../../shared/npcs.js'
 
-export default function DialoguePanel({ character, history, onComplete, onClose }) {
+export default function DialoguePanel({ character, history, npcState, onComplete, onClose }) {
   const [preset, setPreset] = useState(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,7 +27,7 @@ export default function DialoguePanel({ character, history, onComplete, onClose 
     setError('')
     const timeout = setTimeout(() => controller.abort(), 60000)
     try {
-      const reply = await sendChat({ npc: character.id, message: text, history, signal: controller.signal })
+      const reply = await sendChat({ npc: character.id, message: text, history, npcState, signal: controller.signal })
       if (requestRef.current !== controller) return
       if (controller.signal.aborted) throw new Error('Dialogue request aborted')
       onComplete(character.id, text, reply)

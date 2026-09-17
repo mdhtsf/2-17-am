@@ -61,7 +61,7 @@ test('unknown NPCs and invalid updater results fail without changing state', () 
   assert.deepEqual(states, createInitialNpcState())
 })
 
-test('frontend API contract ignores runtime state and preserves per-NPC history', async t => {
+test('frontend API sends only selected NPC state and preserves per-NPC history', async t => {
   const requests = []
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     assert.equal(url, '/api/chat')
@@ -71,8 +71,8 @@ test('frontend API contract ignores runtime state and preserves per-NPC history'
   let states = createInitialNpcState()
   const histories = { kai: [{ role: 'user', content: '我叫西瓜。' }, { role: 'assistant', content: '嗯。' }], mira: [] }
   const before = structuredClone(histories)
-  states = npcStateReducer(states, { type: 'update', npcId: 'kai', updater: () => ({ trust: 1 }) })
+  states = npcStateReducer(states, { type: 'update', npcId: 'kai', updater: () => ({ familiarity: 1, hasMetPlayer: true }) })
   for (const npc of ['kai', 'mira']) await sendChat({ npc, message: '你好', history: histories[npc], npcState: states[npc], npcStates: states })
-  assert.deepEqual(requests, ['kai', 'mira'].map(npc => ({ npc, message: '你好', history: before[npc] })))
+  assert.deepEqual(requests, ['kai', 'mira'].map(npc => ({ npc, message: '你好', history: before[npc], npcState: states[npc] })))
   assert.deepEqual(histories, before)
 })

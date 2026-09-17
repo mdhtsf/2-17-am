@@ -85,7 +85,7 @@ test('real API handler with mocked primary/fallback produces one completion per 
   for (const npc of ['kai', 'mira']) {
     const response = await handler.fetch(new Request('http://localhost/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ npc, message: '你好', history: histories[npc] }),
+      body: JSON.stringify({ npc, message: '你好', history: histories[npc], npcState: states[npc] }),
     }))
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { reply: '还醒着。' })
@@ -98,7 +98,7 @@ test('real API handler with mocked primary/fallback produces one completion per 
   const before = states
   const response = await handler.fetch(new Request('http://localhost/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ npc: 'kai', message: '你好', history: [] }),
+    body: JSON.stringify({ npc: 'kai', message: '你好', history: [], npcState: states.kai }),
   }))
   if (response.ok) states = complete(states, 'kai')
   assert.equal(response.status, 502)
