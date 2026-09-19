@@ -4,12 +4,14 @@ import { createRoot } from 'react-dom/client'
 import App from '../src/App.jsx'
 import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
+import { installIntervalClock, verifyAmbientRuntime } from './ambient.browser.jsx'
 import '../src/styles.css'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const output = document.getElementById('results')
 const container = document.getElementById('test-root')
 const root = createRoot(container)
+const intervalClock = installIntervalClock()
 const checks = []
 const check = (condition, label) => {
   if (!condition) throw new Error(label)
@@ -71,6 +73,7 @@ const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
 try {
+  await verifyAmbientRuntime(root, check, intervalClock)
   await act(async () => root.render(<RuntimeHarness />))
   check(JSON.stringify(runtime.npcStates) === JSON.stringify(createInitialNpcState()), 'React initializes both NPC states')
   await act(async () => {
@@ -88,6 +91,15 @@ try {
   check(JSON.stringify(runtime.npcStates) === JSON.stringify(createInitialNpcState()), 'new page lifetime starts from initial state')
 
   await act(async () => root.render(<App onNpcStateChange={observeState} />))
+  const sceneBefore = container.querySelector('.scene').outerHTML
+  const positionsBefore = [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|')
+  await intervalClock.tick(71000)
+  check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'making_coffee,checking_phone,grooming', 'App passes independently advancing activities into scene hotspots')
+  checkState(0, 0, 'automatic ambient ticks do not change relationship state')
+  check(requests.length === 0, 'automatic ambient ticks never request dialogue')
+  check(positionsBefore === [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|'), 'ambient activities do not move hotspots')
+  const withoutActivity = html => html.replace(/ data-activity="[^"]*"/g, '')
+  check(withoutActivity(sceneBefore) === withoutActivity(container.querySelector('.scene').outerHTML), 'scene markup is unchanged apart from nonvisual activity data')
   await click('.npc-kai')
   check(spoken() === '还没睡？', 'Kai panel opens normally')
   checkState(0, 0, 'opening Kai does not mark an encounter')
@@ -98,6 +110,8 @@ try {
   await submit()
   checkState(0, 0, 'empty submission does not update state')
   await fill('今晚忙吗？')
+  await intervalClock.tick(37000)
+  check(container.querySelector('input').value === '今晚忙吗？' && spoken().length > 0, 'ambient tick preserves an open panel and its draft')
   await act(async () => {
     const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: true })
     container.querySelector('input').dispatchEvent(event)
@@ -106,6 +120,8 @@ try {
   mode = 'deferred'
   await submit()
   await submit()
+  await intervalClock.tick(71000)
+  check(container.querySelector('[aria-label="发送"]').disabled, 'ambient ticks do not cancel or restart a pending dialogue')
   check(requests.length === 1 && container.querySelector('[aria-label="发送"]').disabled, 'loading prevents duplicate requests')
   checkState(0, 0, 'pending and duplicate submission do not update state')
   check(requests[0].npcState.familiarity === 0 && requests[0].npcState.hasMetPlayer === false, 'first Kai request sends stranger state before completion')
@@ -181,10 +197,12 @@ try {
   check(requests.every(request => Object.keys(request.npcState).sort().join(',') === Object.keys(createInitialNpcState()[request.npc]).sort().join(',')), 'Kai requests never carry Mira state or a combined state map')
   check(requests.every(request => request.history.every(entry => (entry.role === 'user' || entry.role === 'assistant') && Object.keys(entry).sort().join(',') === 'content,role')), 'history never contains system messages or state context')
   check(!/trust|familiarity|deadlineStress|hasMetPlayer|exhausted|neutral/.test(container.textContent), 'game has no runtime debug UI')
+  check(!/behind_counter|making_coffee|checking_phone|grooming|currentActivity/.test(container.textContent), 'ambient activities have no visible debug labels')
   await click('.npc-cat')
   check(container.querySelector('.cat-feedback').textContent.includes('没什么意思'), 'Cat keeps local feedback')
   checkState(5, 4, 'Cat does not change NPC state')
   await act(async () => root.render(<App key="new-page-session" onNpcStateChange={observeState} />))
+  check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'behind_counter,reading_notes,sleeping' && intervalClock.timers.size === 3, 'App remount resets all activities and replaces old timers')
   checkState(0, 0, 'new App lifetime resets encounter and familiarity')
   await click('.npc-kai')
   await say('新一轮')
@@ -197,6 +215,7 @@ try {
   output.textContent = JSON.stringify({ passed: checks.length, error: error.message, checks }, null, 2)
 } finally {
   await act(async () => root.unmount())
+  intervalClock.restore()
   window.fetch = originalFetch
   window.setTimeout = originalSetTimeout
   delete globalThis.IS_REACT_ACT_ENVIRONMENT

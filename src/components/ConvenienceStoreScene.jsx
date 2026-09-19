@@ -3,7 +3,7 @@ import SceneBackground from './SceneBackground'
 import RainOverlay from './RainOverlay'
 import { scene } from '../data/scene'
 
-export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat }) {
+export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat, activities }) {
   return <section
     className="scene"
     style={{ '--scene-aspect': scene.width / scene.height }}
@@ -16,6 +16,7 @@ export default function ConvenienceStoreScene({ selectedId, onSelect, catActive,
         <NPC
           key={hotspot.id}
           hotspot={hotspot}
+          currentActivity={activities[hotspot.id]}
           selected={hotspot.id === 'cat' ? catActive : selectedId === hotspot.id}
           onSelect={hotspot.id === 'cat' ? onCat : () => onSelect(hotspot.id)}
         />

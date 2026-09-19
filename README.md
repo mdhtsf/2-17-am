@@ -311,6 +311,32 @@ npm run build
 
 本阶段 78 项 Node 测试、62 项 React/浏览器检查全部通过，Console 无 error/warning。构建通过 `npm run build -- --config ...` 成功完成，临时配置继承项目配置并设置 `envDir: false`，避免加载环境文件；项目 Vite 配置和依赖未修改。
 
+## Stage 4.1 — Ambient NPC Behavior Foundation
+
+新增独立的、session-local 的 ambient activity runtime。`src/data/npcActivities.js` 集中定义活动顺序、初始活动和计时间隔；`src/game/npcActivityTransitions.js` 的纯函数 `nextNpcActivity(npcId, currentActivity)` 校验角色和活动后返回下一项，未知角色、无效或串用其他角色的活动会抛出 RangeError。
+
+| NPC | 活动循环（第一项为初始活动，最后一项回到第一项） | 间隔 |
+| --- | --- | --- |
+| Kai | behind_counter → making_coffee → checking_shelf → looking_out_window | 37 秒 |
+| Mira | reading_notes → checking_phone → choosing_drink → staring_out_window | 53 秒 |
+| Cat | sleeping → grooming → watching_door → wandering | 71 秒 |
+
+`useNpcActivities()` 使用独立 useReducer 和不可变快照，每个 NPC 始终对应一个有效活动字符串。提供 `getNpcActivity(npcId)`、`setNpcActivity(npcId, activity)`、`advanceNpcActivity(npcId)`、`resetNpcActivities()`。重置恢复全部初始活动，不重启计时；刷新或重新挂载 App 会重新开始整个 session。
+
+每个 NPC 使用一个独立 setInterval，首次切换分别发生在各自间隔之后。effect 清理所有计时器，Strict Mode 不会留下重复计时器；普通重渲染不重启计时。hook 可接受 `{ intervals: { kai, mira, cat } }` 供测试配置，修改间隔时替换旧计时器。生产使用上述慢速错开间隔；后台标签页可能被浏览器节流，不进行离线追赶或时间持久化。
+
+App 将 activities 传给场景，再将 currentActivity 传给对应 NPC hotspot，仅写入非视觉的 `data-activity`。没有新增 debug 标签、行走动画或位置变化，场景图、hotspot 坐标和 DialoguePanel 保持原样。Stage 4.2 才会把活动映射到位置或动画；例如当前 Cat 的 wandering 只是活动数据，不会移动图片中的猫。
+
+Ambient activity 与 Stage 3.x relationship/dialogue npcState 完全独立：不会改变 familiarity、trust、mood 或 deadlineStress，不会写入 history，也不会发送到 `/api/chat` 或触发自动 LLM 请求。对话进行中活动仍可缓慢推进，不打断输入或请求；活动与对话的连接留待 Stage 4.3。没有数据库、localStorage、新依赖或持久化。
+
+### Stage 4.1 验证
+
+`node --test tests/*.test.js`：87 项通过，包括新增活动循环、初始状态、不可变更新、角色隔离、非法输入、重置和 API 数据边界测试。既有 Stage 2 / 3 测试未删减。
+
+独立 `tests/runtime.browser.html`：85 项 React/浏览器检查通过，包含原有 62 项检查。新增测试以虚拟 interval 时钟验证慢速错开计时、批量更新、Strict Mode 清理、间隔变更、卸载、重新挂载和对话独立性，不需要等待真实几十秒。完成的测试运行 Console 无 error/warning；仅使用 mock fetch，不调用真实 OpenRouter。
+
+生产构建成功：沿用禁用环境文件加载的临时配置执行 `npm run build -- --config ...`，继承项目配置并设置 `envDir: false`。没有读取或修改 `.env.local`，也未修改项目 Vite/Vercel 配置或依赖。
+
 ## 当前美术边界
 
 场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。

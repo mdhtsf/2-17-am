@@ -5,6 +5,7 @@ import { characters, catFeedback } from './data/characters'
 import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 import { useNpcStates } from './hooks/useNpcStates.js'
 import { applyNpcStateEvent } from './game/npcStateTransitions.js'
+import { useNpcActivities } from './hooks/useNpcActivities.js'
 
 export default function App({ onNpcStateChange } = {}) {
   const [selectedId, setSelectedId] = useState(null)
@@ -13,6 +14,8 @@ export default function App({ onNpcStateChange } = {}) {
   const [histories, setHistories] = useState({ kai: [], mira: [] })
   // Owned by App; only the selected NPC's pre-turn snapshot enters a request.
   const npcRuntime = useNpcStates()
+  // Ambient behavior is independent of dialogue state and never enters /api/chat.
+  const ambientRuntime = useNpcActivities()
 
   // Read-only observer for the standalone development test fixture. No game UI.
   useEffect(() => {
@@ -56,7 +59,7 @@ export default function App({ onNpcStateChange } = {}) {
     </header>
     <div className="world-viewport">
       <div className="location-caption" aria-hidden="true"><span className="moon">☾</span><div>AFTER HOURS<small>A small corner<br/>for the restless.</small></div></div>
-      <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} />
+      <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} activities={ambientRuntime.activities} />
       <div className="interaction-area">
         {selectedId
           ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} npcState={npcRuntime.getNpcState(selectedId)} onComplete={completeTurn} onClose={closeDialogue} />
