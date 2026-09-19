@@ -337,6 +337,30 @@ Ambient activity 与 Stage 3.x relationship/dialogue npcState 完全独立：不
 
 生产构建成功：沿用禁用环境文件加载的临时配置执行 `npm run build -- --config ...`，继承项目配置并设置 `envDir: false`。没有读取或修改 `.env.local`，也未修改项目 Vite/Vercel 配置或依赖。
 
+## Stage 4.2A — NPC Visual Layer Foundation
+
+新增独立 Scene Position Model：`src/data/npcSceneLocations.js` 集中定义各 NPC 的合法逻辑地点与 activity → location 映射；纯函数 `getNpcSceneLocation(npcId, activity)` 位于 `src/game/npcSceneLocation.js`。函数复用已有活动校验，拒绝未知 NPC、无效活动和跨角色活动，确定性地返回合法逻辑地点。
+
+| NPC | Activity → logical location |
+| --- | --- |
+| Kai | behind_counter → counter；making_coffee → coffee_station；checking_shelf → shelf；looking_out_window → window |
+| Mira | reading_notes / checking_phone → notes_spot；choosing_drink → fridge；staring_out_window → window |
+| Cat | sleeping / grooming → floor；watching_door → door；wandering → aisle |
+
+`drink_area` 和 `shelf_corner` 是已定义但当前未使用的逻辑地点。地点名表达活动所对应的逻辑位置，不代表背景图里的角色已经到达那里；本阶段没有地点坐标或位置转换。
+
+ConvenienceStoreScene 从现有 activities 直接推导 logicalLocation，再传给 NPC 的非视觉 `data-location`。不新增位置 state/hook，不复制 ambient runtime，不与 relationship state 合并。relationship state、ambient activity、derived scene location 保持三个独立层；activity/location 均不进入 `/api/chat` 或 conversation history，原 Character Prompt、state-aware dialogue、OpenRouter fallback 和定时器不变。
+
+**没有可见移动。** 当前背景图仍然包含烘焙好的 Kai / Mira / Cat；图片、hotspot 坐标、标签、CSS 和 DialoguePanel 均未调整，没有新增精灵或 debug UI。Stage 4.2B 必须先准备独立 NPC 视觉资产和移除原有 NPC 的干净背景，才能在本层之后增加 logicalLocation → coordinates → sprites → movement transitions，避免双重角色画面。本阶段未实施这些后续步骤。
+
+### Stage 4.2A 验证
+
+`node --test tests/*.test.js`：97 项通过，覆盖全部合法活动映射、确定性循环、非法及跨角色输入、不可变配置、relationship state 独立、原 hotspot 坐标和不变的 API payload。
+
+`tests/runtime.browser.html`：100 项 React/浏览器检查通过，保留已有回归，并逐一渲染所有活动验证逻辑地点、热点/标签/图片和可见 DOM 不变。DOM 比较仅忽略非视觉的 `data-activity` / `data-location`，另有独立断言检查它们的正确值。测试运行 Console 无 error/warning，全部对话请求使用 mock fetch。
+
+生产构建成功，沿用禁用环境文件加载的临时配置执行 `npm run build -- --config ...`。没有读取或修改 `.env.local`，没有更改 Vite/Vercel 配置、图片、依赖或服务端代码。
+
 ## 当前美术边界
 
 场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。

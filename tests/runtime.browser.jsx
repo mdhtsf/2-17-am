@@ -5,6 +5,7 @@ import App from '../src/App.jsx'
 import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
 import { installIntervalClock, verifyAmbientRuntime } from './ambient.browser.jsx'
+import { verifySceneLocations, visualMarkup } from './scene-locations.browser.jsx'
 import '../src/styles.css'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -73,6 +74,7 @@ const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
 try {
+  await verifySceneLocations(root, container, check)
   await verifyAmbientRuntime(root, check, intervalClock)
   await act(async () => root.render(<RuntimeHarness />))
   check(JSON.stringify(runtime.npcStates) === JSON.stringify(createInitialNpcState()), 'React initializes both NPC states')
@@ -91,15 +93,16 @@ try {
   check(JSON.stringify(runtime.npcStates) === JSON.stringify(createInitialNpcState()), 'new page lifetime starts from initial state')
 
   await act(async () => root.render(<App onNpcStateChange={observeState} />))
+  check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'counter,notes_spot,floor', 'App initial scene derives locations from initial activities')
   const sceneBefore = container.querySelector('.scene').outerHTML
   const positionsBefore = [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|')
   await intervalClock.tick(71000)
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'making_coffee,checking_phone,grooming', 'App passes independently advancing activities into scene hotspots')
+  check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'coffee_station,notes_spot,floor', 'App timer advances derived locations without storing another state')
   checkState(0, 0, 'automatic ambient ticks do not change relationship state')
   check(requests.length === 0, 'automatic ambient ticks never request dialogue')
   check(positionsBefore === [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|'), 'ambient activities do not move hotspots')
-  const withoutActivity = html => html.replace(/ data-activity="[^"]*"/g, '')
-  check(withoutActivity(sceneBefore) === withoutActivity(container.querySelector('.scene').outerHTML), 'scene markup is unchanged apart from nonvisual activity data')
+  check(visualMarkup(sceneBefore) === visualMarkup(container.querySelector('.scene').outerHTML), 'scene markup is unchanged apart from nonvisual activity/location data')
   await click('.npc-kai')
   check(spoken() === '还没睡？', 'Kai panel opens normally')
   checkState(0, 0, 'opening Kai does not mark an encounter')
