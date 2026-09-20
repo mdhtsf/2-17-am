@@ -1,4 +1,4 @@
-// All merchandise, architecture, lighting and characters live in this one asset.
+// Character-free architecture and lighting; NPC visuals are rendered separately.
 export default function SceneBackground({ scene }) {
   return <img
     className="scene-art"

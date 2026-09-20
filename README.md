@@ -361,6 +361,30 @@ ConvenienceStoreScene 从现有 activities 直接推导 logicalLocation，再传
 
 生产构建成功，沿用禁用环境文件加载的临时配置执行 `npm run build -- --config ...`。没有读取或修改 `.env.local`，没有更改 Vite/Vercel 配置、图片、依赖或服务端代码。
 
+## Stage 4.2B — Independent NPC Visual Assets & Movement
+
+活动首次驱动可见位置：`currentActivity → getNpcSceneLocation() → logicalLocation → getNpcSceneAnchor() → NPC entity`。位置始终是派生数据，没有新增 position state 或 movement timer；沿用 Stage 4.1 的 37 / 53 / 71 秒活动节奏。
+
+主场景使用 `/assets/scenes/after-hours-clean.png`，原场景尺寸 1536×1024、响应式取景、雨层和 DialoguePanel 保持不变。原 `/assets/scenes/after-hours.png` 仍保留，但不再参与活动场景渲染。独立精灵使用 `/assets/npcs/kai.png`、`mira.png`、`cat.png`，路径、原始尺寸和相对场景宽度集中在 `src/data/npcVisuals.js`。
+
+收到的四张素材实际位于 `public/assets/npcs/stage-4-2b-assets/`。本轮仅将其原样复制到上述正式路径；测试验证复制文件与来源逐字节一致。没有重新生成、编辑 PNG，也没有使用或删除 `public/art/` 旧素材。
+
+`src/data/npcSceneAnchors.js` 按 NPC 和逻辑地点集中定义 `{ x, y, scale, zIndex }`。x/y 是完整场景图的百分比，锚点原点为精灵图片的底边中心；所有逻辑地点均有映射，包括暂未被活动使用的 drink_area / shelf_corner。`src/game/npcSceneAnchor.js` 的纯函数拒绝未知角色、无效地点和不属于该 NPC 的地点。
+
+每个 NPC 是一个 button entity，内部包含透明精灵、名称和交互提示。实体统一承担位置、缩放、层级与点击区域，取代原固定 hotspot；Kai/Mira 保持打开各自对话，Cat 保持本地反馈。图片保持原始宽高比、不可拖拽，不新增重复 NPC。
+
+位置变化使用 2.4 秒 ease-in-out CSS transition（left/top/transform）；相同地点的连续活动不会移动，例如 Mira 读笔记→看手机、Cat 睡觉→梳理。支持系统 reduced-motion。柜台遮挡通过同一张干净背景的局部前景复用实现：`scene.counterOcclusion` 集中定义裁剪区域，Kai 在柜台/咖啡台使用后方层级，离开柜台后使用前方层级。前景不接收点击，不包含旧角色画面。
+
+关系状态、familiarity tiers、Character Prompt、history、OpenRouter/fallback、环境变量和 Vercel 配置不变。activity/location/coordinates 不发送到 `/api/chat`，Stage 4.3 才会连接活动与对话；本轮没有真实模型自动调用或新依赖。
+
+### Stage 4.2B 验证与边界
+
+Node 测试覆盖干净背景、透明素材及复制完整性、全部逻辑地点锚点、非法输入、完整派生链、相同地点不移动和不变的 API payload。浏览器回归覆盖三个独立精灵、热点跟随、实际百分比坐标、CSS 过渡、角色点击、重挂载重置和原有对话测试。原 Stage 4.2A 的“不可移动”断言按本阶段目标升级为移动实体断言，其他阶段的行为约束继续保留。
+
+本阶段 `node --test tests/*.test.js` 共 110 项通过；浏览器回归 131 项通过，并在桌面与 390×844 窄屏检查了布局和实际角色点击，Console 无 error/warning。生产构建通过 `npm run build -- --config ...` 成功，沿用继承项目配置、设置 `envDir: false` 的临时配置，避免加载 `.env.local`；未修改项目构建配置。
+
+这是第一轮锚点标定：柜台/咖啡台的遮挡边界，以及 window、shelf、aisle 附近的落点仍值得人工微调。当前直接插值，不绕开货架，不处理复杂遮挡或碰撞；层级按目的地设置。精灵仍是单张静态姿势，猫移动时也保持趴卧外观。Walking animation / pathfinding 有意延后，不作为本轮新增系统。
+
 ## 当前美术边界
 
-场景为静态生成图，角色不能独立呼吸或改变姿态；动态仅来自 CSS 雨层。后续可精修角色造型与研究生设定的一致性、招牌文字，以及将角色分离成与背景一致的透明素材。极窄屏和非 3:2 窗口采用基础取景，优先保证热区可用。
+背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动，但不能独立呼吸、改变姿态或播放行走帧。动态来自 CSS 雨层和位置过渡。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡，不改变当前素材文件。

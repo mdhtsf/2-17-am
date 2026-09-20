@@ -14,13 +14,13 @@ const expectedCycles = {
   cat: ['floor', 'floor', 'door', 'aisle'],
 }
 
-test('baked artwork and original hotspot coordinates stay independent of logical locations', () => {
-  assert.equal(scene.src, '/assets/scenes/after-hours.png')
-  assert.deepEqual(scene.hotspots.map(({ id, x, y, width, height }) => ({ id, x, y, width, height })), [
-    { id: 'kai', x: 25.65, y: 29.88, width: 5.21, height: 13.96 },
-    { id: 'mira', x: 55.34, y: 31.74, width: 6.25, height: 22.27 },
-    { id: 'cat', x: 29.62, y: 58, width: 6.32, height: 5.96 },
-  ])
+test('clean artwork preserves framing and replaces baked visuals and fixed hotspots', () => {
+  assert.equal(scene.src, '/assets/scenes/after-hours-clean.png')
+  assert.equal(scene.width, 1536)
+  assert.equal(scene.height, 1024)
+  assert.deepEqual(scene.npcs.map(npc => npc.id), ['kai', 'mira', 'cat'])
+  assert.ok(scene.npcs.every(npc => !('x' in npc) && !('y' in npc)))
+  assert.equal(scene.hotspots, undefined)
 })
 
 for (const npcId of Object.keys(npcActivities)) {

@@ -5,7 +5,7 @@ import App from '../src/App.jsx'
 import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
 import { installIntervalClock, verifyAmbientRuntime } from './ambient.browser.jsx'
-import { verifySceneLocations, visualMarkup } from './scene-locations.browser.jsx'
+import { verifySceneLocations, checkSceneEntities } from './scene-locations.browser.jsx'
 import '../src/styles.css'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -94,15 +94,16 @@ try {
 
   await act(async () => root.render(<App onNpcStateChange={observeState} />))
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'counter,notes_spot,floor', 'App initial scene derives locations from initial activities')
-  const sceneBefore = container.querySelector('.scene').outerHTML
+  const sceneBefore = container.querySelector('.scene-art').outerHTML
   const positionsBefore = [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|')
   await intervalClock.tick(71000)
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'making_coffee,checking_phone,grooming', 'App passes independently advancing activities into scene hotspots')
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'coffee_station,notes_spot,floor', 'App timer advances derived locations without storing another state')
   checkState(0, 0, 'automatic ambient ticks do not change relationship state')
   check(requests.length === 0, 'automatic ambient ticks never request dialogue')
-  check(positionsBefore === [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|'), 'ambient activities do not move hotspots')
-  check(visualMarkup(sceneBefore) === visualMarkup(container.querySelector('.scene').outerHTML), 'scene markup is unchanged apart from nonvisual activity/location data')
+  check(positionsBefore !== [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|'), 'ambient location changes update the moving entity instead of leaving a fixed hotspot')
+  checkSceneEntities(container, check, 'App automatic movement')
+  check(sceneBefore === container.querySelector('.scene-art').outerHTML, 'movement keeps background framing and artwork unchanged')
   await click('.npc-kai')
   check(spoken() === '还没睡？', 'Kai panel opens normally')
   checkState(0, 0, 'opening Kai does not mark an encounter')
@@ -201,9 +202,11 @@ try {
   check(requests.every(request => request.history.every(entry => (entry.role === 'user' || entry.role === 'assistant') && Object.keys(entry).sort().join(',') === 'content,role')), 'history never contains system messages or state context')
   check(!/trust|familiarity|deadlineStress|hasMetPlayer|exhausted|neutral/.test(container.textContent), 'game has no runtime debug UI')
   check(!/behind_counter|making_coffee|checking_phone|grooming|currentActivity/.test(container.textContent), 'ambient activities have no visible debug labels')
+  const requestsBeforeCat = requests.length
   await click('.npc-cat')
   check(container.querySelector('.cat-feedback').textContent.includes('没什么意思'), 'Cat keeps local feedback')
   checkState(5, 4, 'Cat does not change NPC state')
+  check(requests.length === requestsBeforeCat, 'moving Cat interaction remains local-only')
   await act(async () => root.render(<App key="new-page-session" onNpcStateChange={observeState} />))
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'behind_counter,reading_notes,sleeping' && intervalClock.timers.size === 3, 'App remount resets all activities and replaces old timers')
   checkState(0, 0, 'new App lifetime resets encounter and familiarity')
