@@ -13,7 +13,7 @@ export async function finishMovement(nodes) {
       }))))
       await new Promise(resolve => setTimeout(resolve, KAI_MOVEMENT.settleMs + KAI_MOVEMENT.completionGraceMs + 20))
     })
-    if (nodes.every(node => !node.querySelector('.kai-visual') || node.querySelector('.kai-visual').dataset.phase === 'idle')) return
+    if (nodes.every(node => !node.querySelector('.walking-visual') || node.querySelector('.walking-visual').dataset.phase === 'idle')) return
   }
   throw new Error('Route did not finish')
 }

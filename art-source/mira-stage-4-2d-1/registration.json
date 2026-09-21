@@ -1,0 +1,184 @@
+[
+  {
+    "row": 0,
+    "col": 0,
+    "sourceBounds": [
+      66,
+      43,
+      225,
+      383
+    ],
+    "width": 404,
+    "height": 860,
+    "left": 4,
+    "top": 25
+  },
+  {
+    "row": 1,
+    "col": 0,
+    "sourceBounds": [
+      42,
+      26,
+      217,
+      361
+    ],
+    "width": 377,
+    "height": 720,
+    "left": 68,
+    "top": 16
+  },
+  {
+    "row": 1,
+    "col": 1,
+    "sourceBounds": [
+      51,
+      31,
+      210,
+      361
+    ],
+    "width": 348,
+    "height": 720,
+    "left": 594,
+    "top": 16
+  },
+  {
+    "row": 1,
+    "col": 2,
+    "sourceBounds": [
+      42,
+      29,
+      228,
+      361
+    ],
+    "width": 404,
+    "height": 720,
+    "left": 1078,
+    "top": 16
+  },
+  {
+    "row": 1,
+    "col": 3,
+    "sourceBounds": [
+      50,
+      29,
+      215,
+      361
+    ],
+    "width": 359,
+    "height": 720,
+    "left": 1613,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 0,
+    "sourceBounds": [
+      61,
+      12,
+      228,
+      359
+    ],
+    "width": 348,
+    "height": 720,
+    "left": 82,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 1,
+    "sourceBounds": [
+      52,
+      12,
+      218,
+      358
+    ],
+    "width": 347,
+    "height": 720,
+    "left": 595,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 2,
+    "sourceBounds": [
+      55,
+      14,
+      219,
+      359
+    ],
+    "width": 343,
+    "height": 720,
+    "left": 1109,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 3,
+    "sourceBounds": [
+      50,
+      12,
+      220,
+      359
+    ],
+    "width": 354,
+    "height": 720,
+    "left": 1615,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 0,
+    "sourceBounds": [
+      52,
+      3,
+      210,
+      345
+    ],
+    "width": 334,
+    "height": 720,
+    "left": 89,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 1,
+    "sourceBounds": [
+      52,
+      3,
+      208,
+      345
+    ],
+    "width": 330,
+    "height": 720,
+    "left": 603,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 2,
+    "sourceBounds": [
+      47,
+      3,
+      204,
+      346
+    ],
+    "width": 331,
+    "height": 720,
+    "left": 1115,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 3,
+    "sourceBounds": [
+      44,
+      3,
+      209,
+      342
+    ],
+    "width": 352,
+    "height": 720,
+    "left": 1616,
+    "top": 16
+  }
+]

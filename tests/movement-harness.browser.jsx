@@ -3,7 +3,7 @@ import MovementHarness from './MovementHarness.jsx'
 import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { finishMovement } from './finishMovement.js'
 import { getMovementDirection } from '../src/game/npcMovement.js'
-import { sceneWaypoints } from '../src/data/sceneWaypoints.js'
+import { sceneWaypoints, sceneWaypointEdges } from '../src/data/sceneWaypoints.js'
 
 export async function verifyMovementHarness(root, container, check, intervalClock) {
   const originalFetch = window.fetch
@@ -24,7 +24,7 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
     const others = [...container.querySelectorAll('.npc-mira, .npc-cat')].map(node => node.outerHTML)
     check(!container.querySelector('.route-debug'), 'route debug is off by default')
     await act(async () => container.querySelector('.movement-controls input').click())
-    check(Boolean(container.querySelector('.route-debug')) && container.querySelectorAll('.route-edge').length === 8, 'development toggle displays the authored graph')
+    check(Boolean(container.querySelector('.route-debug')) && container.querySelectorAll('.route-edge').length === sceneWaypointEdges.length, 'development toggle displays the authored graph')
     const buttons = [...container.querySelectorAll('.movement-controls button')]
     check(buttons.length === 5, 'development harness exposes four real destinations and Next')
     for (let i = 1; i <= 4; i++) {
@@ -69,6 +69,24 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
     check(requests === 0, 'debug movement makes no chat or other API calls')
     check(container.querySelector('.scene-art').outerHTML === background, 'debug controls reuse unchanged production scene')
     check([...container.querySelectorAll('.npc-mira, .npc-cat')].every((node, index) => node.outerHTML === others[index]), 'debug destinations never move Mira or Cat')
+    const untouched = [...container.querySelectorAll('.npc-kai, .npc-cat')].map(node => node.outerHTML)
+    await act(async () => {
+      const selector = container.querySelector('select')
+      selector.value = 'mira'
+      selector.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    const miraButtons = [...container.querySelectorAll('.movement-controls button')]
+    check(miraButtons.map(button => button.textContent).join(',') === 'notes_spot,fridge,window,Next →', 'Mira harness offers her own unique activity destinations and Next')
+    check(container.querySelector('.route-debug').getAttribute('aria-label') === 'Mira waypoint graph', 'route debug switches to Mira')
+    for (const index of [1, 2, 0, 3]) {
+      await act(async () => miraButtons[index].click())
+      const entity = container.querySelector('.npc-mira')
+      check(entity.dataset.location === (index === 3 ? 'fridge' : miraButtons[index].textContent), `Mira harness button ${index} immediately targets real activity location`)
+      check(window.matchMedia('(prefers-reduced-motion: reduce)').matches || entity.querySelector('.mira-visual').dataset.phase === 'walking', 'Mira immediately plays walking frames without ambient delay')
+      await finishMovement([entity])
+    }
+    check([...container.querySelectorAll('.npc-kai, .npc-cat')].every((node, index) => node.outerHTML === untouched[index]), 'Mira controls preserve accepted Kai and Cat entities')
+    check(requests === 0 && JSON.stringify(states.npcStates) === before && intervalClock.timers.size === timerCount, 'Mira harness changes no API, relationship state or ambient timing')
   } finally {
     await act(async () => root.render(null))
     window.fetch = originalFetch

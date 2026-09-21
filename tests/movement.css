@@ -4,7 +4,7 @@
   padding: 12px; background: #101b27ee; border: 1px solid #9f8869;
   color: #eddbbe; font: 13px monospace;
 }
-.movement-controls button { padding: 6px 10px; color: inherit; background: #263548; border: 1px solid #777e84; cursor: pointer; }
+.movement-controls button, .movement-controls select { padding: 6px 10px; color: inherit; background: #263548; border: 1px solid #777e84; cursor: pointer; }
 .movement-controls button[aria-pressed="true"] { border-color: #eddbbe; background: #4b4439; }
 .movement-controls small { flex-basis: 100%; }
 .route-debug { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 30; pointer-events: none; overflow: visible; }

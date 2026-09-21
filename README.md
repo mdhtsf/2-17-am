@@ -446,6 +446,28 @@ Kai 现在使用 `src/data/sceneWaypoints.js` 中集中定义的手工通道图�
 
 本轮替换后验证：136 项 Node 测试、302 项浏览器回归通过，生产构建成功。四张运行时 PNG 保持原尺寸，透明边缘为二值 alpha；没有新增依赖。测试确认集成与播放正常，美术定稿仍以场景内目视验收为准。
 
+### Stage 4.2D — Mira Walking Integration
+
+Mira 现在与 Kai 共用 `useNpcMovement`、确定性路由、距离时长、逐段方向和 `WalkingSprite` 帧渲染器。Kai 仍是已验收的参考实现，原素材、路点、速度、帧率和基础尺寸不变。Mira 保留 `reading_notes / checking_phone → notes_spot`、`choosing_drink → fridge`、`staring_out_window → window`；只有目的地改变才走动，段间不回 idle，到达后收势；中途改目标复用当前通道上的 latest-target-wins 行为。
+
+新增四个 `mira_*` 目的地叶节点，复用 `fridge_front` 和 `window_lane` 通道，不增加 Kai 的捷径。`mira_window` 与 Kai 的 `window` 明确区分。已有 `drink_area` 锚点也已连接，但不新增活动去使用它。Mira 的场景坐标和基础宽度 5.76% 保留，远近缩放统一使用既有 .92–1.06 人形深度曲线，脚底仍为 bottom-center。
+
+Mira 的站姿与侧 / 正 / 背向各四帧位于 `public/assets/npcs/mira/`。以原始便利店图为主要参考生成，保留长发、发带、外套、百褶裙和背包；左向镜像侧向。母版、提示词和导出登记见 `art-source/mira-stage-4-2d/README.md`。没有新依赖；背景和其他角色 PNG 未改。
+
+在开发页 `/tests/movement.html` 的 **Test NPC** 中选择 **Mira**，可立即触发 **notes_spot / fridge / window / Next**；勾选 **Show route debug** 查看她的路线和当前段。Kai 原测试能力保留，控件不会进入生产页面。测试页不启动 ambient 计时器、不请求 API、不改变关系或对话状态。
+
+运行 `node --test tests/*.test.js`、浏览器 `/tests/runtime.browser.html` 和 `npm run build` 验证。共享逐段与四方向播放测试分别覆盖 Kai 和 Mira；另外检查全部目的地连通、热点跟随、中断、场景状态与接口隔离。Cat 保持原来的静态精灵移动，行走动画推迟到 Stage 4.2E。四帧步态的细节、背包与裙摆稳定性，以及平面背景缺少货架前景遮罩的限制，留待后续最终视觉打磨。
+
+本阶段验证结果：160 项 Node 测试、434 项浏览器回归通过；生产构建成功，生产入口不包含调试控件，Mira 对话面板正常打开，Console 无 error/warning。手动确认 notes_spot → fridge_front → window_lane → mira_window 到达后恢复 idle。API 测试使用既有 mock 边界，没有在本阶段发起真实模型请求。
+
+### Stage 4.2D-1 — Mira Visual Fidelity & Scale Correction
+
+仅修正 Mira 素材与基础尺寸。以当前已验收的 Kai 为像素处理和人形比例参考，以原便利店场景保留 Mira 的长发、发带、服装与背包身份，重绘 idle 及侧 / 正 / 背向各四帧。简化眼睛、发丝与阴影，增强块状轮廓；本轮没有修改 Kai、Cat、背景、路线、速度、方向、环境行为或对话。
+
+`src/data/npcVisuals.js` 中 Mira 基础宽度输入从 6.4 改为 7.4，共享 0.9 系数不变，实际场景宽度 **5.76% → 6.66%**。站姿画布从 **401×911 → 411×911**，额外宽度用于完整容纳新轮廓；可见高度和脚底基线不变，因此同一透视下可见身高约增加 **12.8%**。行走图仍各 **2048×768**，每帧 **512×768**，沿用现有底边中心登记与透视插值。
+
+生成母版、完整提示词、逐帧裁切与导出说明见 `art-source/mira-stage-4-2d-1/README.md`。测试页中将 Kai 移到 shelf，再选择 Mira，可直接对照两人在场景尺度下的比例与风格。160 项 Node 测试、434 项浏览器回归、生产构建通过，浏览器无 error/warning；验证覆盖脚底对齐、四方向播放和既有交互。本轮未提交、打 tag 或推送。生成帧的裙摆、发尾和背包仍可能有细微轮廓差异，最终美术认可需人工目视验收。
+
 ## 当前美术边界
 
-背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动；目前仅 Kai 在移动中播放行走帧。动态来自 CSS 雨层、位置过渡和 Kai 步态。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡，不改变当前素材文件。Kai 已改为近似匀速，受四帧原素材和周期取整影响，步幅与实际地面位移仍可能略有差异；Kai 已沿手工通道绕行主要家具，但没有动态避障或方向对应的站立姿势。
+背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动；Kai 和 Mira 在移动中播放行走帧。动态来自 CSS 雨层、位置过渡和人形步态。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡。Kai 和 Mira 近似匀速，受四帧素材和周期取整影响，步幅与实际地面位移仍可能略有差异；两人沿手工通道绕行主要家具，但没有动态避障或方向对应的站立姿势。

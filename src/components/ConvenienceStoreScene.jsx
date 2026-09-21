@@ -7,7 +7,7 @@ import { getNpcSceneLocation } from '../game/npcSceneLocation.js'
 import { getNpcSceneAnchor } from '../game/npcSceneAnchor.js'
 import { npcVisuals } from '../data/npcVisuals.js'
 
-export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat, activities, onKaiMovementChange, children }) {
+export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat, activities, onKaiMovementChange, onMiraMovementChange, children }) {
   return <section
     className="scene"
     style={{ '--scene-aspect': scene.width / scene.height }}
@@ -21,7 +21,7 @@ export default function ConvenienceStoreScene({ selectedId, onSelect, catActive,
         const logicalLocation = getNpcSceneLocation(npc.id, currentActivity)
         return <NPC
             key={npc.id}
-            onMovementChange={npc.id === 'kai' ? onKaiMovementChange : undefined}
+            onMovementChange={npc.id === 'kai' ? onKaiMovementChange : npc.id === 'mira' ? onMiraMovementChange : undefined}
             npc={npc}
             visual={npcVisuals[npc.id]}
             anchor={getNpcSceneAnchor(npc.id, logicalLocation)}

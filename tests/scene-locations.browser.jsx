@@ -14,7 +14,7 @@ export function checkSceneEntities(container, check, label) {
   check(nodes.length === 3 && container.querySelectorAll('.npc-sprite').length === 3, `${label}: exactly one sprite and hitbox per NPC`)
   check(nodes.every(node => {
     const id = node.className.match(/npc-(kai|mira|cat)/)[1]
-    const visual = node.querySelector('.kai-visual')
+    const visual = node.querySelector('.walking-visual')
     const active = visual?.dataset.phase === 'walking'
     const anchor = active ? sceneWaypoints[visual.dataset.waypoint] : getNpcSceneAnchor(id, node.dataset.location)
     const layer = active ? getSegmentLayer(sceneWaypoints[visual.dataset.segmentFrom], anchor) : anchor.zIndex

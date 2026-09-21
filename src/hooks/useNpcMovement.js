@@ -1,14 +1,14 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { getMovementDirection, getMovementDuration, KAI_MOVEMENT } from '../game/npcMovement.js'
+import { getMovementDirection, getMovementDuration, HUMAN_MOVEMENT } from '../game/npcMovement.js'
 import { resolveNpcRoute, resolveInterruptedRoute } from '../game/npcRoute.js'
-import { sceneWaypoints } from '../data/sceneWaypoints.js'
+import { sceneWaypoints, getNpcWaypoint } from '../data/sceneWaypoints.js'
 import { getSegmentLayer } from '../game/sceneDepth.js'
 
 const IDLE = { direction: null, phase: 'idle', segment: 0, route: [] }
 
 // Navigation progress is transient presentation state: a node / occupied edge,
 // never another world position. Logical destination still derives from activity.
-export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
+export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcId = 'kai') {
   const previous = useRef(null)
   const progress = useRef({ node: null, edge: null })
   const segment = useRef(0)
@@ -16,6 +16,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
 
   useLayoutEffect(() => {
     if (!enabled) return
+    const destination = logicalLocation ? getNpcWaypoint(npcId, logicalLocation) : null
     const entity = entityRef.current
     const prior = previous.current
     previous.current = anchor
@@ -27,11 +28,11 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
       entity.style.zIndex = point.zIndex
     }
     const atDestination = () => {
-      progress.current = { node: logicalLocation || null, edge: null }
+      progress.current = { node: destination, edge: null }
       setMovement({ ...IDLE, destination: logicalLocation })
     }
     if (!prior || !getMovementDirection(prior, anchor) || reducedMotion.matches) {
-      if (logicalLocation) resolveNpcRoute(logicalLocation, logicalLocation) // Validate even on initial mount.
+      if (destination) resolveNpcRoute(destination, destination) // Validate even on initial mount.
       place(anchor)
       atDestination()
       return
@@ -46,11 +47,11 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
     const occupiedEdge = progress.current.edge
     const origin = readPosition()
     // Bare anchors remain supported for the isolated segment renderer tests.
-    // Every production Kai entity provides a validated logical destination.
+    // Every production human entity provides a validated logical destination.
     const route = logicalLocation
       ? occupiedEdge
-        ? resolveInterruptedRoute(...occupiedEdge, origin, logicalLocation)
-        : resolveNpcRoute(progress.current.node, logicalLocation)
+        ? resolveInterruptedRoute(...occupiedEdge, origin, destination)
+        : resolveNpcRoute(progress.current.node, destination)
       : [{ ...anchor, id: 'anchor' }]
     const routeFrom = occupiedEdge ? occupiedEdge.find(id => id !== route[0]?.id) : progress.current.node
     let index = 0
@@ -69,7 +70,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
     const settle = () => {
       phase = 'settling'
       setMovement({ ...current, phase })
-      timer = window.setTimeout(idle, KAI_MOVEMENT.settleMs)
+      timer = window.setTimeout(idle, HUMAN_MOVEMENT.settleMs)
     }
     const startSegment = () => {
       if (disposed) return
@@ -114,7 +115,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
         startSegment() // No idle / settle between waypoints.
       }
       if (!duration) { finishSegment(); return }
-      timer = window.setTimeout(finishSegment, duration + KAI_MOVEMENT.completionGraceMs)
+      timer = window.setTimeout(finishSegment, duration + HUMAN_MOVEMENT.completionGraceMs)
     }
     const onArrival = event => {
       if (event.target !== entity || !['left', 'top'].includes(event.propertyName)) return
@@ -135,7 +136,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation) {
       entity.removeEventListener('transitionend', onArrival)
       reducedMotion.removeEventListener('change', onPreferenceChange)
     }
-  }, [anchor.x, anchor.y, entityRef, enabled, logicalLocation])
+  }, [anchor.x, anchor.y, entityRef, enabled, logicalLocation, npcId])
 
   return movement
 }

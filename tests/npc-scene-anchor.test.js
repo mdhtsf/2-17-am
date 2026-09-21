@@ -13,7 +13,7 @@ import { sendChat } from '../src/lib/chat.js'
 
 const assetHashes = {
   kai: 'bc66237db3df02d9e894ff2e0f16d86d3448bec251ed9c16dccfa375b5466755',
-  mira: '91043e45c6ba5dfc2e9060c7ad89cc44a14b0433ce595d9bfb33375d2986ede4',
+  mira: '1097fe34570d69cca96b4512ef3a65e55c81625d6d6f20b79b3ed9bb5ec49bb1',
   cat: 'e59e52e2ee8542e541d82f0c981c3ee039ff6e6a2bff1f4435cde5c4055d8cf3',
 }
 const sha256 = data => createHash('sha256').update(data).digest('hex')
@@ -42,7 +42,7 @@ for (const npcId of ['kai', 'mira', 'cat']) {
   })
   test(`${npcId}: registered transparent sprite matches its asset revision and dimensions`, () => {
     const visual = npcVisuals[npcId]
-    assert.equal(visual.src, `/assets/npcs/${npcId}.png`)
+    assert.equal(visual.src, npcId === 'mira' ? '/assets/npcs/mira/mira-idle.png' : `/assets/npcs/${npcId}.png`)
     const png = readFileSync(new URL(`../public${visual.src}`, import.meta.url))
     assert.equal(sha256(png), assetHashes[npcId])
     assert.equal(png.readUInt32BE(16), visual.width)

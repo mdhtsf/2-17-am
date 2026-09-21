@@ -78,8 +78,10 @@ const spoken = () => container.querySelector('.spoken').textContent
 
 try {
   await verifyRoutes(root, container, check)
+  await verifyRoutes(root, container, check, 'mira')
   await verifyMovementHarness(root, container, check, intervalClock)
   await verifyWalking(root, container, check)
+  await verifyWalking(root, container, check, 'mira')
   await verifySceneLocations(root, container, check)
   await verifyAmbientRuntime(root, check, intervalClock)
   await act(async () => root.render(<RuntimeHarness />))

@@ -5,6 +5,7 @@ import { getKaiSceneDepth } from '../game/sceneDepth.js'
 // Counter nodes are behind its existing foreground cutout, not public aisles.
 const point = (id, x, y, zone = 'floor') => Object.freeze({ id, x, y, zone, ...getKaiSceneDepth({ y, zone }) })
 const destination = (id, zone = 'floor') => point(id, npcSceneAnchors.kai[id].x, npcSceneAnchors.kai[id].y, zone)
+const miraDestination = id => point(`mira_${id}`, npcSceneAnchors.mira[id].x, npcSceneAnchors.mira[id].y)
 export const sceneWaypoints = Object.freeze({
   counter: destination('counter', 'counter'),
   coffee_station: destination('coffee_station', 'counter'),
@@ -15,6 +16,10 @@ export const sceneWaypoints = Object.freeze({
   window_lane: point('window_lane', 72, 67),
   door_lane: point('door_lane', 81, 75),
   window: destination('window'),
+  mira_notes_spot: miraDestination('notes_spot'),
+  mira_fridge: miraDestination('fridge'),
+  mira_drink_area: miraDestination('drink_area'),
+  mira_window: miraDestination('window'),
 })
 
 // Only these undirected corridor segments are walkable. No general-space search.
@@ -23,7 +28,18 @@ export const sceneWaypointEdges = Object.freeze([
   ['counter_lane', 'counter_exit'], ['counter_exit', 'shelf'],
   ['shelf', 'fridge_front'], ['fridge_front', 'window_lane'],
   ['window_lane', 'door_lane'], ['door_lane', 'window'],
+  // Leaf connections preserve every accepted Kai route (no new shortcuts).
+  ['mira_notes_spot', 'fridge_front'], ['mira_fridge', 'fridge_front'],
+  ['mira_drink_area', 'fridge_front'], ['mira_window', 'window_lane'],
 ].map(edge => Object.freeze(edge)))
+
+// NPC-local names can overlap: Mira's window is not Kai's window.
+export function getNpcWaypoint(npcId, location) {
+  if (!['kai', 'mira'].includes(npcId) || !Object.hasOwn(npcSceneAnchors[npcId], location)) {
+    throw new RangeError('Unknown human NPC destination')
+  }
+  return npcId === 'kai' ? location : `mira_${location}`
+}
 
 // A registry of actual reusable foreground layers, not imaginary z-index masks.
 // More masks can be registered here when the artwork supports them.

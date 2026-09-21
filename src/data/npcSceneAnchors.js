@@ -1,4 +1,4 @@
-import { getKaiSceneDepth } from '../game/sceneDepth.js'
+import { getKaiSceneDepth, getHumanSceneDepth } from '../game/sceneDepth.js'
 
 // Bottom-center anchors in percentages of the full 1536 × 1024 scene, before cropping.
 // Kai can stand behind the counter foreground (layer 2); other destinations are in front.
@@ -10,10 +10,10 @@ export const npcSceneAnchors = Object.freeze({
     window: Object.freeze({ x: 88, y: 79, ...getKaiSceneDepth({ y: 79 }) }),
   }),
   mira: Object.freeze({
-    notes_spot: Object.freeze({ x: 58.6, y: 55, scale: 1, zIndex: 3 }),
-    fridge: Object.freeze({ x: 64.8, y: 57, scale: 0.97, zIndex: 3 }),
-    drink_area: Object.freeze({ x: 68, y: 59, scale: 1, zIndex: 3 }),
-    window: Object.freeze({ x: 75.5, y: 72.5, scale: 1, zIndex: 4 }),
+    notes_spot: Object.freeze({ x: 58.6, y: 55, ...getHumanSceneDepth({ y: 55 }) }),
+    fridge: Object.freeze({ x: 64.8, y: 57, ...getHumanSceneDepth({ y: 57 }) }),
+    drink_area: Object.freeze({ x: 68, y: 59, ...getHumanSceneDepth({ y: 59 }) }),
+    window: Object.freeze({ x: 75.5, y: 72.5, ...getHumanSceneDepth({ y: 72.5 }) }),
   }),
   cat: Object.freeze({
     floor: Object.freeze({ x: 32.8, y: 64.5, scale: 1, zIndex: 4 }),
