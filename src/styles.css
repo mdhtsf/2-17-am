@@ -123,7 +123,35 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
   transform-origin: center bottom;
   transition: left 2.4s ease-in-out, top 2.4s ease-in-out, transform 2.4s ease-in-out;
 }
+.npc-kai { transition: left var(--npc-move-duration, 0ms) linear, top var(--npc-move-duration, 0ms) linear, transform var(--npc-move-duration, 0ms) linear; }
 .npc-sprite { display: block; width: 100%; height: auto; image-rendering: pixelated; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.kai-visual { display: block; position: relative; z-index: 1; pointer-events: none; }
+.kai-ground-shadow { position: absolute; z-index: 0; left: 50%; bottom: 1.5%; width: 70%; height: 3.5%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, #09121b35 0%, #09121b18 45%, transparent 72%); pointer-events: none; }
+.kai-visual .npc-sprite { opacity: 1; transition: none; }
+.kai-visual[data-phase="walking"] .npc-sprite { opacity: 0; }
+.kai-visual[data-phase="settling"] .npc-sprite { transition: opacity var(--walk-settle) linear; }
+/* C-3 asset registration: 928 visible pixels, feet at y=968 in the same 351×988 idle canvas. */
+.kai-walk {
+  position: absolute; height: 93.9271%; bottom: 2.025%; left: 50%;
+  aspect-ratio: 512 / 720;
+  transform: translateX(-50%) scaleX(var(--walk-mirror));
+  pointer-events: none;
+}
+.kai-walk-frame {
+  position: absolute; inset: 0; overflow: hidden;
+  animation: kai-walk-frame var(--walk-cycle) steps(1, end) infinite;
+}
+.kai-visual[data-phase="settling"] .kai-walk { opacity: 0; transition: opacity var(--walk-settle) linear; }
+.kai-visual[data-phase="settling"] .kai-walk-frame { animation: none; opacity: 0; }
+.kai-visual[data-phase="settling"] .kai-walk-frame:first-child { opacity: 1; }
+.kai-walk-frame img {
+  position: absolute; width: 400%; max-width: none; height: auto;
+  image-rendering: pixelated; user-select: none; -webkit-user-drag: none;
+}
+@keyframes kai-walk-frame {
+  0% { opacity: 1; }
+  25%, 100% { opacity: 0; }
+}
 .npc-indicator {
   position: absolute;
   bottom: 103%;

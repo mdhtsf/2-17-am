@@ -385,6 +385,67 @@ Node 测试覆盖干净背景、透明素材及复制完整性、全部逻辑地
 
 这是第一轮锚点标定：柜台/咖啡台的遮挡边界，以及 window、shelf、aisle 附近的落点仍值得人工微调。当前直接插值，不绕开货架，不处理复杂遮挡或碰撞；层级按目的地设置。精灵仍是单张静态姿势，猫移动时也保持趴卧外观。Walking animation / pathfinding 有意延后，不作为本轮新增系统。
 
+## Stage 4.2C — NPC Walking Animation
+
+### Stage 4.2C-1 — Kai Walking Animation
+
+Kai 移动时使用四帧方向精灵：左右共用 `kai-walk-side.png`，向左镜像；向下使用 `kai-walk-front.png`，向上使用 `kai-walk-back.png`。素材位于 `public/assets/npcs/kai/`，PNG 保持原样。`kaiWalking.js` 记录帧内透明留白的对齐信息，保持脚底基线和宽高比；CSS 以 8 fps 循环播放，到达后恢复原 `kai.png`。
+
+位置仍由 activity → logicalLocation → anchor 派生。`npcMovement.js` 根据前后锚点的主轴判断方向，`useNpcMovement` 只管理临时行走状态，沿用 2.4 秒直接过渡；反向过渡提前完成时也恢复站姿。目标变更取消旧计时器，卸载清理计时器和监听器，支持 Strict Mode 与 reduced-motion。精灵、标签和点击区域仍属于同一个 NPC entity，缩放、层级和点击对话不变。
+
+未修改 ambient timing、关系状态、history 或 API；动画数据不进入请求。Mira / Cat 继续使用原静态精灵移动。绕开货架的 waypoint routing 留到 Stage 4.2C-2，Mira / Cat 行走动画留待后续。
+
+验证命令仍为 `node --test tests/*.test.js`、浏览器打开 `/tests/runtime.browser.html` 和 `npm run build`。新增检查覆盖四方向、镜像、逐帧播放、到达站姿、连续改目标、卸载清理和原有对话回归。旧素材副本已从工作区移除，因此素材完整性测试改为校验原图 SHA-256，不依赖重复文件。
+
+### Stage 4.2C-1.5 — Kai Movement Polish & Development Test Harness
+
+本阶段替代 Kai 固定 2.4 秒的过渡；Mira / Cat 仍保持原样。`src/game/npcMovement.js` 集中配置 Kai 的速度与节拍：1536×1024 场景坐标中的 155 px/s、8 fps、四帧一周期、时长下限 500 ms / 上限 8000 ms、到达收势 125 ms。距离先按场景宽高换算成像素，再计算时长并取最近的完整 500 ms 步态周期。极短/极长距离受上下限约束；正常路线中的量化误差不会随窗口尺寸改变。
+
+位置使用 linear 过渡，单段保持同一个主轴朝向。中断时只读取 DOM 当前呈现的位置作为新段起点，再使用原逻辑地点对应的目标锚点，不新增位置状态。旧完成回调和收势回调均失效，避免跳回旧位置或提前恢复站姿。四方向共享固定显示框，以同一底部基线对齐原图；到达后停止帧循环，125 ms 淡回原站姿，不新增弹跳。到达后没有持续计时器，卸载清理监听器与计时器。
+
+**立即测试移动：**
+
+1. 在项目目录运行 `npm run dev`。
+2. 打开终端显示的本地地址，并加上 `/tests/movement.html`，例如 `http://localhost:5173/tests/movement.html`。
+3. 点击 `counter`、`coffee_station`、`shelf`、`window`，或反复点击 `Next →`。刷新后从 counter 开始，无需等待 ambient interval。
+4. 连续点不同目的地可验收中断；正常页面仍是 `/`。
+
+页面位于 `tests/`，由 `import.meta.env.DEV` 限制，并复用真实 ConvenienceStoreScene / NPC / KaiSprite。只在 fixture 内手动选择已有 Kai 活动，不挂载游戏 App、环境计时器、关系状态或 DialoguePanel，不调用 `/api/chat`。正常入口不导入它；生产 build 不包含测试页面或可见调试控件。本页只用于移动验收，不能用来测试聊天。
+
+新增验证覆盖距离/上下限、固定帧框和脚底、完整播放与收势、旧回调失效、真实 CSS 中断连续性、匀速位移、开发入口隔离，以及原有 ambient / relationship / dialogue 回归。运行 `node --test tests/*.test.js`，并用浏览器打开 `/tests/runtime.browser.html` 查看完整回归结果。
+
+本阶段验证：114 项 Node 测试、桌面与 390×844 窄屏各 237 项浏览器检查、reduced-motion 169 项检查通过，Console 无 error/warning。生产构建通过；构建预览中普通页面和测试路径均不显示移动控件。
+
+### Stage 4.2C-2 — Waypoint Navigation & Scene Depth Polish
+
+Kai 现在使用 `src/data/sceneWaypoints.js` 中集中定义的手工通道图。四个原目的地的 x/y 保持不变，新增柜台内通道、柜台出口、冷柜前通道、窗侧通道和门口通道，共 9 个节点、8 条双向连接。柜台内的投影坐标沿用既有前景遮挡；公共走廊沿货架外侧布置，没有开放任意两点之间的直线捷径。
+
+`src/game/npcRoute.js` 使用小型确定性 BFS 遍历已批准的连接，返回中间路点与最终目的地，拒绝未知节点；配置冻结，调用者不能修改它。没有 A*、navmesh、碰撞或物理引擎。例如：
+
+- counter → counter_lane → counter_exit → shelf
+- coffee_station → counter → counter_lane → counter_exit → shelf
+- shelf → fridge_front → window_lane → door_lane → window
+
+每段继续使用既有距离时长模型和方向选择。段间保持 walking，复用同一个步态动画，不插入 idle、不重新挂载播放层；整条路线完成才进行 125 ms 收势。中途更换目的地时读取当前显示位置，仅比较沿当前边继续到端点或折返的路线，禁止跨家具跳到其他“最近节点”。旧计时器/回调失效，导航进度只记录当前节点或边，不改变 activity / logicalLocation / relationship / dialogue state。
+
+`src/game/sceneDepth.js` 将 Kai 的缩放统一为后方 .92 到前方 1.06，目的地与中间路点共用同一规则。缩放随每段位置一起插值，transform-origin 仍为底边中心；底部低透明椭圆渐变阴影随实体缩放，不使用滤镜。柜台后方为 layer 1，现有柜台前景为 layer 2，公共走廊按节点深度使用 3–5。走出出口后才切换到公共区域层级；反向进入时由原有剪裁遮挡重叠部分。`sceneForegroundLayers` 注册真实前景层，便于以后增加经过校准的遮挡。
+
+**路线可视化：** 开发服务器的 `/tests/movement.html` 保留四个目的地和 Next；勾选默认关闭的 **Show route debug**，显示路点名称、通道边、解析路线、当前段与目的地。图层只存在于开发 fixture，正常游戏与生产构建不包含调试控件。页面仍不挂载 ambient 定时器或对话、不请求 `/api/chat`。
+
+原有图片均未改动。背景仍是合成平面图，只有已注册的柜台前景能真正遮挡角色；层级不能替代未拆分的货架/冷柜遮罩。路线避免主要家具占地，但边缘、原柜台落点投影和角色间重叠仍可能需要人工标定。Mira / Cat 的路线行走有意延后，本阶段不修改它们的现有行为。
+
+本阶段验证：136 项 Node 测试通过；桌面与 390×844 窄屏各 302 项浏览器检查通过，覆盖逐段导航、连续步态、中断、脚底与缩放、移动测试页及原有运行时回归，Console 无 error/warning。生产构建通过，生产入口没有路线调试控件。
+
+### Stage 4.2C-3 — Kai Sprite Asset Quality Correction
+
+本轮先修正 Kai 素材质量，再等待美术验收决定是否继续移动打磨。以原始 `public/assets/scenes/after-hours.png` 中的店员为主要参考，通过内置 imagegen 重建统一母版：站姿 1 帧、侧向 / 正面 / 背面行走各 4 帧。缩小眼部高光，恢复克制的深色眼睛、碎发轮廓、蓝色制服与深色围裙，增强跨步和摆臂轮廓。
+
+运行时仍使用 `public/assets/npcs/kai.png`（351×988）和 `public/assets/npcs/kai/kai-walk-{side,front,back}.png`（各 2048×768）；左向继续镜像侧向。原始生成母版、逐帧登记和提示词保存在 `art-source/kai-stage-4-2c-3/`，不由前端导入。仅更新 `kaiWalking.js` 的帧登记与 CSS 显示高度，以对齐新素材脚底；路线、速度、帧率、环境调度和对话代码保持不变。没有新依赖。
+
+使用既有 `/tests/movement.html` 验收场景尺寸下的面部、衣着、步幅和站姿切换；本阶段不宣称生成帧已达到最终手工逐像素动画质量，侧向四帧的腿部交替与细微轮廓稳定性仍需目视确认。详细资产来源与导出规则见 `art-source/kai-stage-4-2c-3/README.md`。
+
+本轮替换后验证：136 项 Node 测试、302 项浏览器回归通过，生产构建成功。四张运行时 PNG 保持原尺寸，透明边缘为二值 alpha；没有新增依赖。测试确认集成与播放正常，美术定稿仍以场景内目视验收为准。
+
 ## 当前美术边界
 
-背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动，但不能独立呼吸、改变姿态或播放行走帧。动态来自 CSS 雨层和位置过渡。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡，不改变当前素材文件。
+背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动；目前仅 Kai 在移动中播放行走帧。动态来自 CSS 雨层、位置过渡和 Kai 步态。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡，不改变当前素材文件。Kai 已改为近似匀速，受四帧原素材和周期取整影响，步幅与实际地面位移仍可能略有差异；Kai 已沿手工通道绕行主要家具，但没有动态避障或方向对应的站立姿势。

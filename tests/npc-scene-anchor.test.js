@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { npcSceneLocations } from '../src/data/npcSceneLocations.js'
 import { npcActivities, createInitialNpcActivities } from '../src/data/npcActivities.js'
 import { npcVisuals } from '../src/data/npcVisuals.js'
@@ -9,6 +10,13 @@ import { getNpcSceneAnchor } from '../src/game/npcSceneAnchor.js'
 import { nextNpcActivity } from '../src/game/npcActivityTransitions.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
 import { sendChat } from '../src/lib/chat.js'
+
+const assetHashes = {
+  kai: 'bc66237db3df02d9e894ff2e0f16d86d3448bec251ed9c16dccfa375b5466755',
+  mira: '91043e45c6ba5dfc2e9060c7ad89cc44a14b0433ce595d9bfb33375d2986ede4',
+  cat: 'e59e52e2ee8542e541d82f0c981c3ee039ff6e6a2bff1f4435cde5c4055d8cf3',
+}
+const sha256 = data => createHash('sha256').update(data).digest('hex')
 
 for (const npcId of ['kai', 'mira', 'cat']) {
   test(`${npcId}: every logical location has an immutable percentage anchor`, () => {
@@ -32,11 +40,11 @@ for (const npcId of ['kai', 'mira', 'cat']) {
     }
     assert.equal(getNpcSceneAnchor(npcId, getNpcSceneLocation(npcId, activity)), first)
   })
-  test(`${npcId}: provided transparent sprite is copied unchanged and has correct dimensions`, () => {
+  test(`${npcId}: registered transparent sprite matches its asset revision and dimensions`, () => {
     const visual = npcVisuals[npcId]
     assert.equal(visual.src, `/assets/npcs/${npcId}.png`)
     const png = readFileSync(new URL(`../public${visual.src}`, import.meta.url))
-    assert.deepEqual(png, readFileSync(new URL(`../public/assets/npcs/stage-4-2b-assets/${npcId}.png`, import.meta.url)))
+    assert.equal(sha256(png), assetHashes[npcId])
     assert.equal(png.readUInt32BE(16), visual.width)
     assert.equal(png.readUInt32BE(20), visual.height)
     assert.equal(png[25], 6, 'PNG has an alpha channel')
@@ -45,8 +53,8 @@ for (const npcId of ['kai', 'mira', 'cat']) {
 }
 
 test('clean background is a byte-for-byte copy of the supplied asset', () => {
-  assert.deepEqual(readFileSync(new URL('../public/assets/scenes/after-hours-clean.png', import.meta.url)),
-    readFileSync(new URL('../public/assets/npcs/stage-4-2b-assets/after-hours-clean.png', import.meta.url)))
+  assert.equal(sha256(readFileSync(new URL('../public/assets/scenes/after-hours-clean.png', import.meta.url))),
+    '6af2c73443c18511ff14947a5f640b877662b7fb46741446cfc87caa0c51f9c5')
 })
 
 test('invalid NPCs, locations, and cross-NPC locations are rejected', () => {

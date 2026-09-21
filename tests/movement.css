@@ -1,0 +1,17 @@
+.movement-controls {
+  position: fixed; z-index: 100; inset: auto 12px 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 12px; background: #101b27ee; border: 1px solid #9f8869;
+  color: #eddbbe; font: 13px monospace;
+}
+.movement-controls button { padding: 6px 10px; color: inherit; background: #263548; border: 1px solid #777e84; cursor: pointer; }
+.movement-controls button[aria-pressed="true"] { border-color: #eddbbe; background: #4b4439; }
+.movement-controls small { flex-basis: 100%; }
+.route-debug { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 30; pointer-events: none; overflow: visible; }
+.route-debug polyline { fill: none; stroke-width: 3; }
+.route-edge { stroke: #7fddd2; opacity: .65; }
+.resolved-route { stroke: #ffc76b; stroke-dasharray: 8 5; }
+.current-segment { stroke: #fff3a8; stroke-width: 5 !important; }
+.route-debug circle { fill: #fff3a8; stroke: #162230; stroke-width: 2; }
+.route-debug text { font: 14px monospace; fill: #fff3a8; paint-order: stroke; stroke: #101b27; stroke-width: 3; }
+.route-status { flex-basis: 100%; overflow-wrap: anywhere; line-height: 1.5; }

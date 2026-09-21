@@ -1,8 +1,12 @@
+import { finishMovement } from './finishMovement.js'
+import { sceneWaypoints } from '../src/data/sceneWaypoints.js'
+import { getSegmentLayer } from '../src/game/sceneDepth.js'
 import React, { act } from 'react'
 import ConvenienceStoreScene from '../src/components/ConvenienceStoreScene.jsx'
 import { npcActivities } from '../src/data/npcActivities.js'
 import { npcVisuals } from '../src/data/npcVisuals.js'
 import { getNpcSceneAnchor } from '../src/game/npcSceneAnchor.js'
+import { getMovementDuration } from '../src/game/npcMovement.js'
 
 // Stage 4.2B replaces no-movement assertions with moving-entity invariants.
 export function checkSceneEntities(container, check, label) {
@@ -10,10 +14,13 @@ export function checkSceneEntities(container, check, label) {
   check(nodes.length === 3 && container.querySelectorAll('.npc-sprite').length === 3, `${label}: exactly one sprite and hitbox per NPC`)
   check(nodes.every(node => {
     const id = node.className.match(/npc-(kai|mira|cat)/)[1]
-    const anchor = getNpcSceneAnchor(id, node.dataset.location)
+    const visual = node.querySelector('.kai-visual')
+    const active = visual?.dataset.phase === 'walking'
+    const anchor = active ? sceneWaypoints[visual.dataset.waypoint] : getNpcSceneAnchor(id, node.dataset.location)
+    const layer = active ? getSegmentLayer(sceneWaypoints[visual.dataset.segmentFrom], anchor) : anchor.zIndex
     return node.style.left === `${anchor.x}%` && node.style.top === `${anchor.y}%`
       && node.style.getPropertyValue('--npc-scale') === String(anchor.scale)
-      && node.style.zIndex === String(anchor.zIndex)
+      && node.style.zIndex === String(layer)
       && node.querySelector('.npc-sprite').getAttribute('src') === npcVisuals[id].src
       && Boolean(node.querySelector('.npc-label'))
   }), `${label}: each sprite, label and hitbox share the derived anchor`)
@@ -50,11 +57,11 @@ export async function verifySceneLocations(root, container, check) {
       check(nodes.slice(1).every((node, i) => node.getAttribute('style') === previousStyles[i + 1]), 'same-location Mira and Cat activities do not change visual position')
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       const movement = nodes[0].getAnimations()
-      check(reducedMotion ? movement.length === 0 : movement.length > 0 && movement.every(animation => animation.effect.getTiming().duration === 2400), 'changed location uses restrained CSS movement and respects reduced motion')
+      check(reducedMotion ? movement.length === 0 : movement.length > 0 && movement.every(animation => animation.effect.getTiming().duration === getMovementDuration(getNpcSceneAnchor('kai', 'counter'), getNpcSceneAnchor('kai', 'coffee_station')) && animation.effect.getTiming().easing === 'linear'), 'changed location uses restrained CSS movement and respects reduced motion')
       check(nodes.slice(1).every(node => node.getAnimations().length === 0), 'same-location activities start no movement animation')
     }
     // Wait for CSS movement only, not for the ambient clock's real-world intervals.
-    await Promise.all(nodes.flatMap(node => node.getAnimations().map(animation => animation.finished)))
+    await finishMovement(nodes)
     const sceneBounds = container.querySelector('.scene').getBoundingClientRect()
     check(nodes.every(node => {
       const id = node.className.match(/npc-(kai|mira|cat)/)[1]

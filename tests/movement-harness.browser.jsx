@@ -1,0 +1,76 @@
+import React, { act, StrictMode, useLayoutEffect } from 'react'
+import MovementHarness from './MovementHarness.jsx'
+import { useNpcStates } from '../src/hooks/useNpcStates.js'
+import { finishMovement } from './finishMovement.js'
+import { getMovementDirection } from '../src/game/npcMovement.js'
+import { sceneWaypoints } from '../src/data/sceneWaypoints.js'
+
+export async function verifyMovementHarness(root, container, check, intervalClock) {
+  const originalFetch = window.fetch
+  let requests = 0
+  let states
+  function StateWitness() {
+    const runtime = useNpcStates()
+    useLayoutEffect(() => { states = runtime })
+    return null
+  }
+  window.fetch = async () => { requests++; throw new Error('Movement must not call an API') }
+  const timerCount = intervalClock.timers.size
+  try {
+    await act(async () => root.render(<StrictMode><StateWitness /><MovementHarness /></StrictMode>))
+    await act(async () => states.updateNpcState('kai', () => ({ trust: 2 })))
+    const before = JSON.stringify(states.npcStates)
+    const background = container.querySelector('.scene-art').outerHTML
+    const others = [...container.querySelectorAll('.npc-mira, .npc-cat')].map(node => node.outerHTML)
+    check(!container.querySelector('.route-debug'), 'route debug is off by default')
+    await act(async () => container.querySelector('.movement-controls input').click())
+    check(Boolean(container.querySelector('.route-debug')) && container.querySelectorAll('.route-edge').length === 8, 'development toggle displays the authored graph')
+    const buttons = [...container.querySelectorAll('.movement-controls button')]
+    check(buttons.length === 5, 'development harness exposes four real destinations and Next')
+    for (let i = 1; i <= 4; i++) {
+      const index = i % 4
+      await act(async () => buttons[index].click())
+      check(container.querySelector('.npc-kai').dataset.location === buttons[index].textContent, `harness click ${i} immediately targets the real Kai entity`)
+    }
+    await act(async () => buttons[4].click())
+    check(container.querySelector('.npc-kai').dataset.location === 'coffee_station', 'Next follows the existing Kai destination cycle')
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const entity = container.querySelector('.npc-kai')
+      const finish = () => finishMovement([entity])
+      await act(async () => buttons[0].click())
+      await finish()
+      await act(async () => buttons[3].click())
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
+      const position = () => {
+        const style = getComputedStyle(entity)
+        return [parseFloat(style.left), parseFloat(style.top)]
+      }
+      const beforeTurn = position()
+      await act(async () => buttons[2].click())
+      check(Math.hypot(...position().map((value, index) => value - beforeTurn[index])) < 5, 'interruption continues at the rendered position without teleporting')
+      const target = sceneWaypoints[entity.querySelector('.kai-visual').dataset.waypoint]
+      const origin = { x: beforeTurn[0] / entity.offsetParent.clientWidth * 100, y: beforeTurn[1] / entity.offsetParent.clientHeight * 100 }
+      check(entity.querySelector('.kai-visual').dataset.direction === getMovementDirection(origin, target), 'interrupted facing follows the next safe waypoint rather than abandoned destination')
+      const duration = parseFloat(entity.style.getPropertyValue('--npc-move-duration'))
+      const transitions = entity.getAnimations()
+      check(transitions.length > 0 && transitions.every(animation => animation.effect.getTiming().duration === duration), 'interruption uses the new duration without CSS reverse shortening')
+      const samples = []
+      for (const fraction of [0.25, 0.5, 0.75]) {
+        transitions.forEach(animation => { animation.pause(); animation.currentTime = duration * fraction })
+        samples.push(position())
+      }
+      check(samples[0].every((_, axis) => Math.abs((samples[2][axis] - samples[1][axis]) - (samples[1][axis] - samples[0][axis])) < 1), 'equal time slices have equal displacement at steady walking velocity')
+      transitions.forEach(animation => animation.play())
+      await finish()
+      check(entity.querySelector('.kai-visual').dataset.phase === 'idle', 'real CSS arrival and brief settle finish in idle')
+    }
+    check(JSON.stringify(states.npcStates) === before, 'debug movement preserves relationship state')
+    check(intervalClock.timers.size === timerCount, 'debug harness installs or changes no ambient intervals')
+    check(requests === 0, 'debug movement makes no chat or other API calls')
+    check(container.querySelector('.scene-art').outerHTML === background, 'debug controls reuse unchanged production scene')
+    check([...container.querySelectorAll('.npc-mira, .npc-cat')].every((node, index) => node.outerHTML === others[index]), 'debug destinations never move Mira or Cat')
+  } finally {
+    await act(async () => root.render(null))
+    window.fetch = originalFetch
+  }
+}

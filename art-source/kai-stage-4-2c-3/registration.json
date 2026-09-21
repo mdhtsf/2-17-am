@@ -1,0 +1,188 @@
+[
+  {
+    "row": 0,
+    "col": 0,
+    "sourceBounds": [
+      84,
+      63,
+      195,
+      360
+    ],
+    "width": 349,
+    "height": 928,
+    "left": 1,
+    "top": 40
+  },
+  {
+    "row": 1,
+    "col": 0,
+    "source": "kai-side-source.png",
+    "sourceBounds": [
+      141,
+      77,
+      476,
+      702
+    ],
+    "width": 386,
+    "height": 720,
+    "left": 63,
+    "top": 16
+  },
+  {
+    "row": 1,
+    "col": 1,
+    "source": "kai-side-source.png",
+    "sourceBounds": [
+      153,
+      77,
+      393,
+      702
+    ],
+    "width": 277,
+    "height": 720,
+    "left": 630,
+    "top": 16
+  },
+  {
+    "row": 1,
+    "col": 2,
+    "source": "kai-side-source.png",
+    "sourceBounds": [
+      54,
+      77,
+      390,
+      702
+    ],
+    "width": 388,
+    "height": 720,
+    "left": 1086,
+    "top": 16
+  },
+  {
+    "row": 1,
+    "col": 3,
+    "source": "kai-side-source.png",
+    "sourceBounds": [
+      69,
+      77,
+      308,
+      702
+    ],
+    "width": 276,
+    "height": 720,
+    "left": 1654,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 0,
+    "sourceBounds": [
+      76,
+      36,
+      197,
+      338
+    ],
+    "width": 290,
+    "height": 720,
+    "left": 111,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 1,
+    "sourceBounds": [
+      76,
+      37,
+      193,
+      338
+    ],
+    "width": 281,
+    "height": 720,
+    "left": 628,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 2,
+    "sourceBounds": [
+      68,
+      37,
+      190,
+      341
+    ],
+    "width": 290,
+    "height": 720,
+    "left": 1135,
+    "top": 16
+  },
+  {
+    "row": 2,
+    "col": 3,
+    "sourceBounds": [
+      66,
+      37,
+      186,
+      338
+    ],
+    "width": 288,
+    "height": 720,
+    "left": 1648,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 0,
+    "sourceBounds": [
+      72,
+      19,
+      200,
+      325
+    ],
+    "width": 303,
+    "height": 720,
+    "left": 105,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 1,
+    "sourceBounds": [
+      78,
+      19,
+      194,
+      327
+    ],
+    "width": 273,
+    "height": 720,
+    "left": 632,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 2,
+    "sourceBounds": [
+      69,
+      19,
+      194,
+      325
+    ],
+    "width": 296,
+    "height": 720,
+    "left": 1132,
+    "top": 16
+  },
+  {
+    "row": 3,
+    "col": 3,
+    "sourceBounds": [
+      62,
+      19,
+      182,
+      325
+    ],
+    "width": 284,
+    "height": 720,
+    "left": 1650,
+    "top": 16
+  }
+]

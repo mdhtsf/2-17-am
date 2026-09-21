@@ -6,6 +6,9 @@ import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
 import { installIntervalClock, verifyAmbientRuntime } from './ambient.browser.jsx'
 import { verifySceneLocations, checkSceneEntities } from './scene-locations.browser.jsx'
+import { verifyRoutes } from './routes.browser.jsx'
+import { verifyWalking } from './walking.browser.jsx'
+import { verifyMovementHarness } from './movement-harness.browser.jsx'
 import '../src/styles.css'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -74,6 +77,9 @@ const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
 try {
+  await verifyRoutes(root, container, check)
+  await verifyMovementHarness(root, container, check, intervalClock)
+  await verifyWalking(root, container, check)
   await verifySceneLocations(root, container, check)
   await verifyAmbientRuntime(root, check, intervalClock)
   await act(async () => root.render(<RuntimeHarness />))
@@ -93,6 +99,7 @@ try {
   check(JSON.stringify(runtime.npcStates) === JSON.stringify(createInitialNpcState()), 'new page lifetime starts from initial state')
 
   await act(async () => root.render(<App onNpcStateChange={observeState} />))
+  check(!container.querySelector('.movement-controls'), 'normal game never displays the development movement harness')
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'counter,notes_spot,floor', 'App initial scene derives locations from initial activities')
   const sceneBefore = container.querySelector('.scene-art').outerHTML
   const positionsBefore = [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|')
