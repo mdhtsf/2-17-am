@@ -8,7 +8,6 @@ import { npcVisuals } from '../src/data/npcVisuals.js'
 import { getNpcSceneLocation } from '../src/game/npcSceneLocation.js'
 import { getNpcSceneAnchor } from '../src/game/npcSceneAnchor.js'
 import { nextNpcActivity } from '../src/game/npcActivityTransitions.js'
-import { createInitialNpcState } from '../src/data/npcState.js'
 import { sendChat } from '../src/lib/chat.js'
 
 const assetHashes = {
@@ -75,9 +74,7 @@ test('same-location transitions reuse exactly the same anchor', () => {
   }
 })
 
-test('visual derivation cannot affect relationship state or dialogue payload', async t => {
-  const relationship = createInitialNpcState()
-  const before = structuredClone(relationship)
+test('visual derivation never adds rendering data to dialogue payload', async t => {
   const requests = []
   t.mock.method(globalThis, 'fetch', async (_, options) => {
     requests.push(JSON.parse(options.body))
@@ -87,10 +84,9 @@ test('visual derivation cannot affect relationship state or dialogue payload', a
     for (const currentActivity of npcActivities[npc]) {
       const logicalLocation = getNpcSceneLocation(npc, currentActivity)
       const anchor = getNpcSceneAnchor(npc, logicalLocation)
-      const request = { npc, message: '你好', history: [], npcState: relationship[npc] }
+      const request = { npc, message: '你好', history: [] }
       await sendChat({ ...request, currentActivity, logicalLocation, coordinates: anchor })
       assert.deepEqual(requests.at(-1), request)
     }
   }
-  assert.deepEqual(relationship, before)
 })

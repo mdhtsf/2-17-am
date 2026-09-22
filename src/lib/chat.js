@@ -1,8 +1,8 @@
-export async function sendChat({ npc, message, history, npcState, signal }) {
+export async function sendChat({ npc, message, history, activity, signal }) {
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ npc, message, history, npcState }),
+    body: JSON.stringify({ npc, message, history, activity }),
     signal,
   })
   // A Vite-only server can return HTML: treat it as a failure, never NPC dialogue.

@@ -1,4 +1,7 @@
 import SceneForeground from './SceneForeground.jsx'
+import { useEffect } from 'react'
+import { npcSpriteAssets } from '../data/npcSpriteAssets.js'
+import { loadSprite } from '../lib/spriteAssets.js'
 import NPC from './NPC'
 import SceneBackground from './SceneBackground'
 import RainOverlay from './RainOverlay'
@@ -8,6 +11,7 @@ import { getNpcSceneAnchor } from '../game/npcSceneAnchor.js'
 import { npcVisuals } from '../data/npcVisuals.js'
 
 export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat, activities, onKaiMovementChange, onMiraMovementChange, onCatMovementChange, children }) {
+  useEffect(() => { npcSpriteAssets.forEach(loadSprite) }, [])
   return <section
     className="scene"
     style={{ '--scene-aspect': scene.width / scene.height }}

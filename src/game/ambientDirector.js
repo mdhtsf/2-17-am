@@ -38,8 +38,11 @@ function weightedChoice(choices, random) {
   return choices.find(choice => (remaining -= choice.weight) < 0) || choices.at(-1)
 }
 
-export function chooseAmbientEvent(activities, recent = [], random = Math.random) {
-  const candidates = ambientNpcIds.filter(id => id !== recent.at(-1))
+export function chooseAmbientEvent(activities, recent = [], random = Math.random, locked = []) {
+  const eligible = ambientNpcIds.filter(id => !locked.includes(id))
+  if (!eligible.length) return null
+  const alternatives = eligible.filter(id => id !== recent.at(-1))
+  const candidates = alternatives.length ? alternatives : eligible
   const { id } = weightedChoice(candidates.map(id => ({
     id, weight: recent.includes(id) ? AMBIENT_DIRECTOR.cooldownWeight : 1,
   })), random)
@@ -56,15 +59,17 @@ export function createAmbientDirector({ getActivities, onActivity, random = Math
   let first = true
   let pending = null
   let recent = []
+  let locked = []
   const movements = new Map()
   const settled = () => ambientNpcIds.every(id => movements.get(id)?.phase === 'idle')
   const cancel = () => { if (timer !== null) clearTimer(timer); timer = null }
   const schedule = () => {
-    if (!running || timer !== null || pending || !settled()) return
+    if (!running || timer !== null || pending || !settled() || locked.length === ambientNpcIds.length) return
     timer = setTimer(() => {
       timer = null
       if (!running || pending || !settled()) return
-      const event = chooseAmbientEvent(getActivities(), recent, random)
+      const event = chooseAmbientEvent(getActivities(), recent, random, locked)
+      if (!event) return
       // Reserve before React dispatch so another event cannot race the first
       // walking report. Same-location/reduced-motion idle reports also release it.
       pending = event
@@ -76,6 +81,11 @@ export function createAmbientDirector({ getActivities, onActivity, random = Math
   return {
     start() { running = true; schedule() },
     stop() { running = false; cancel() },
+    setInteractionLocks(ids) {
+      locked = ambientNpcIds.filter(id => ids.includes(id))
+      if (locked.length === ambientNpcIds.length) cancel()
+      schedule()
+    },
     reportMovement(npcId, movement) {
       if (!ambientNpcIds.includes(npcId)) throw new RangeError('Unknown ambient NPC')
       movements.set(npcId, movement)

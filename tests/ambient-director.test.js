@@ -124,3 +124,37 @@ test('any ongoing movement pauses scheduling; cleanup and Strict Mode restart ke
   assert.equal(f.timers.size, 1)
   f.director.stop()
 })
+
+test('interaction locks exclude only interacting NPCs without changing existing deadlines', () => {
+  const f = fixture()
+  for (const id of ambientNpcIds) f.report(id, 'idle')
+  f.director.start()
+  const timer = [...f.timers.keys()][0]
+  f.director.setInteractionLocks(['kai'])
+  assert.equal([...f.timers.keys()][0], timer)
+  f.fire()
+  assert.equal(f.events[0].npcId, 'mira')
+  f.report('mira', 'idle')
+  f.director.setInteractionLocks([])
+  f.fire()
+  assert.equal(f.events[1].npcId, 'kai', 'closing interaction restores eligibility')
+  f.director.stop()
+})
+
+test('all locked pauses safely and unlocking resumes; only eligible NPC may repeat', () => {
+  const f = fixture()
+  for (const id of ambientNpcIds) f.report(id, 'idle')
+  f.director.start()
+  f.director.setInteractionLocks(ambientNpcIds)
+  assert.equal(f.timers.size, 0)
+  f.director.setInteractionLocks(['mira', 'cat'])
+  assert.equal(f.timers.size, 1)
+  assert.equal(chooseAmbientEvent(createInitialNpcActivities(), ['kai'], () => 0, ['mira','cat']).npcId, 'kai')
+  assert.equal(chooseAmbientEvent(createInitialNpcActivities(), [], () => 0, ambientNpcIds), null)
+  f.fire()
+  f.director.setInteractionLocks(['kai']) // active journey is not cancelled
+  assert.equal(f.timers.size, 0)
+  f.report('kai', 'idle')
+  assert.equal(f.timers.size, 1)
+  f.director.stop()
+})

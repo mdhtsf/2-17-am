@@ -304,3 +304,13 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
   animation: cat-steps var(--cat-cycle) steps(4, end) infinite; }
 @keyframes cat-steps { to { transform: translateX(-100%); } }
 @media (prefers-reduced-motion: reduce) { .cat-walk img { animation: none; } }
+
+/* Decode readiness, not the requested activity/phase, owns visibility. */
+.walking-visual[data-render-mode] .npc-sprite,
+.walking-visual[data-render-mode] .activity-sprite,
+.walking-visual[data-render-mode] .walking-sprite,
+.walking-visual[data-render-mode] .cat-walk { opacity: 0; transition: none; }
+.walking-visual[data-render-mode="idle"] .npc-sprite,
+.walking-visual[data-render-mode="activity"] .activity-sprite,
+.walking-visual[data-render-mode="walk"] .walking-sprite,
+.walking-visual[data-render-mode="walk"] .cat-walk { opacity: 1; transition: none; }

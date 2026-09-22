@@ -79,7 +79,7 @@ DialoguePanel → fetch POST /api/chat → api/chat.js
 `api/chat.js` 是 Vercel Node.js Function，采用 Web Request / Response 接口。请求示例：
 
 ```json
-{"npc":"mira","message":"你为什么这么晚还在这里？","history":[]}
+{"npc":"mira","message":"你为什么这么晚还在这里？","history":[],"activity":"reading_notes"}
 ```
 
 成功返回 `{ "reply": "..." }`；失败统一返回 `{ "error": "..." }`。非 POST 返回 405；无效 JSON、未知角色、空白或超长 message、错误 history 返回 400；服务端异常返回 500。Cat 不进入这个 API。
@@ -193,7 +193,9 @@ npm run build
 
 本阶段 Node 测试共 55 项通过，`npm run build` 成功。已有 `tests/dialogue.browser.js` 依赖旧 Playwright 工具的 `page.route`，当前浏览器接口不支持该 mock 能力，未重跑这一整套脚本；只复查了 Kai / Mira 面板打开、切换、关闭和猫反馈。没有执行真实 OpenRouter 自动测试。
 
-## Stage 3.1：NPC State Foundation
+## Stage 3.1：NPC State Foundation（历史，已移除）
+
+> 以下记录为当时实现；Stage 4 收尾已移除这些关系状态、递进规则和提示词。当前 API 不要求或使用 npcState，以后文 Stage 4 Closeout 为准。
 
 NPC runtime state 是当前页面内的结构化角色状态容器，与 conversation history 独立。初始值集中在 `src/data/npcState.js`，通过 `createInitialNpcState()` 创建；每次调用都会生成独立对象，默认值和返回的快照只读，避免跨角色或跨 session 共享可变引用。当前字段都是基本类型。
 
@@ -232,7 +234,9 @@ Node 测试共 62 项通过：新增 7 项 state / API contract 测试，原有 
 
 本轮本地浏览器测试通过 `createServer({ envFile: false })` 禁用环境文件加载；构建使用临时配置继承原 `vite.config.js` 并设置 `envDir: false`，通过 `npm run build -- --config ...` 成功完成。没有读取或修改 `.env.local`，也没有改变项目 Vite 配置或新增依赖。
 
-## Stage 3.2：NPC State Transitions
+## Stage 3.2：NPC State Transitions（历史，已移除）
+
+> 以下记录为当时实现；Stage 4 收尾已移除这些关系状态、递进规则和提示词。当前 API 不要求或使用 npcState，以后文 Stage 4 Closeout 为准。
 
 状态规则集中在 `src/game/npcStateTransitions.js` 的纯函数 `applyNpcStateEvent(npcId, currentState, event)` 中。目前只支持 `dialogue_completed`：首次成功对话将 `hasMetPlayer` 设为 `true`；每次成功对话让 `familiarity + 1`，用 `Math.min(currentState.familiarity + 1, 5)` 限制最大值为 5。函数不修改输入，不依赖 React、history、网络或存储；未知 event 原样返回当前 state，Cat / 未知 NPC 抛出与现有 state API 一致的 RangeError。
 
@@ -257,7 +261,9 @@ npm run build
 
 本阶段 71 项 Node 测试、50 项 React/浏览器检查全部通过，Console 无 error/warning，`npm run build -- --config ...` 成功。验证不调用真实 OpenRouter，不读取或修改 `.env.local`。沿用 Stage 3.1 禁用环境文件加载的本地测试服务器和临时构建配置；未修改 Vite 配置或依赖。
 
-## Stage 3.3：State-Aware Dialogue
+## Stage 3.3：State-Aware Dialogue（历史，已移除）
+
+> 以下记录为当时实现；Stage 4 收尾已移除这些关系状态、递进规则和提示词。当前 API 不要求或使用 npcState，以后文 Stage 4 Closeout 为准。
 
 从本阶段起，`/api/chat` 请求增加必填 `npcState`。App 只把当前选中角色的快照交给 DialoguePanel，`sendChat()` 只发送以下四项，不发送整个 `npcStates`、state prompt 或模型配置。之前阶段的三字段请求示例是历史协议，当前请求应包含状态，例如：
 
@@ -555,6 +561,24 @@ Cat 现在复用 `useNpcMovement`、现有 waypoint 图、逐段路线与 latest
 验证：207 项 Node 测试、880 项浏览器检查通过，生产构建通过，Console 无 error/warning。覆盖完整活动映射、PNG 尺寸/alpha、脚底和可见高度登记、每段行走隐藏活动图、到达显示、原地切换，以及既有 Director、Kai/Mira/Cat、柜台/货架遮挡和对话回归。
 
 视觉限制：本轮是静态动作，不模拟真实拿取／摆放物品；手与机器、货架格位没有物理约束。新姿态的轮廓和头身观感仍可能与原 idle 有轻微差别，虽然脚底和可见高度已统一。没有活动循环动画，也没有把活动状态接入对话；Stage 4.5 未开始。未 commit、tag 或 push。
+
+### Stage 4 Closeout — Activity Dialogue, Coherence & Cold Assets
+
+当前请求为 `{ npc, message, history, activity? }`。活动定义集中于 `shared/npcActivities.js`，原 `src/data/npcActivities.js` 重导出同一份定义。API 校验活动是否属于对应 NPC；非法 id、对象、其他角色活动或自由文字返回 400。省略 activity 仍可用。`server/npc-activity-context.js` 仅用白名单 id 构造简短的服务端语义，不接收客户端提示词或坐标、路线、方向等渲染数据。角色可能正在走向活动目的地，提示词不擅自声称动作已完成。
+
+OpenRouter messages：角色人格 → 固定 `server/scene-tone.js` → 可选活动上下文 → 当前 NPC history → 本次玩家消息。夜雨、凌晨 2:17、克制疲惫和细微善意始终存在，但不要求每句话复述天气或活动。Kai 始终话少、有干冷幽默；Mira 稍健谈、赶论文、疲惫而偶有自嘲。模型选择、512 token 上限、reasoning 关闭、超时和 fallback 行为不变。
+
+按本轮设计调整，删除 Stage 3 的 state 容器、成功对话递增、hasMetPlayer、trust、familiarity 和 stranger/recognized/familiar 等级提示及其专属测试。mood/deadlineStress 的固定人格特征留在服务器角色说明，不作为可升级状态。`completeTurn` 只写入原有 per-NPC history；旧客户端额外传来的 npcState 被忽略，不进入模型上下文。没有新分数或长期记忆。
+
+Director 在执行事件时排除当前对话角色，不重置已有随机等待，也不改变一场移动的互斥规则。切换/关闭对话后释放旧角色；没有对话面板时，Cat 的短暂反馈期间锁定 Cat。已经开始的路线继续完成，锁定只阻止新活动指派，避免引入移动中断系统。
+
+**消失问题：** 修复前在本地生产构建、Cache-Control: no-store、活动/行走 PNG 延迟响应环境中复现：idle 图片已加载却 opacity=0，活动 PNG 尚无自然尺寸，导致角色空白。现在场景初始化预加载所有登记素材；`spriteAssets.js` 去重并等待 image.decode，保留解码后的 Image；`useLoadedSprite` 在目标素材就绪前保留最后可绘制描述（含姿态裁剪或行走方向），解码失败仍保留旧图。显示模式与逻辑 movement phase 分离，不暂停或改写路线，也不同时显示两套精灵。初次页面加载仍需等待初始 idle 图片；慢网下可能暂以旧姿态随锚点移动。
+
+冷加载重放：先 `npm run build`，再 `node tests/cold-assets-server.mjs`，打开 `http://127.0.0.1:5187/`。这是只服务 dist 的本地测试工具，不调用 API、不读取环境密钥；所有新姿态/行走素材延迟 12 秒且不缓存，首轮固定选择 Kai。修复后 14 秒期间每 500ms 采样一次，28 组样本中，初始图可用后的空白数和重复可见精灵数均为 0，覆盖 walking 时保留 idle 和到达后显示活动图。
+
+本轮保留 movement/activity/occlusion 及 API fallback 回归，另测活动校验、服务端夜间基调与不递进、交互排除/释放、解码等待、过期加载和失败保留。189 项 Node 测试、851 项浏览器/runtime 检查通过，生产构建和 git diff --check 通过；Console 无 error/warning。测试调用模拟 OpenRouter，没有发起真实模型请求或部署。
+
+仍有限制：模型遵循语气的效果仍需人工实聊验收；图像加载失败会继续显示旧姿态，刷新后重试；正在发生的移动不因打开对话而取消。步态真实感、美术和尺度微调留到 Final Polish，不在本轮处理。没有开始 Stage 5，没有 commit、tag 或 push。
 
 ## 当前美术边界
 

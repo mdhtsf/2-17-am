@@ -3,24 +3,15 @@ import ConvenienceStoreScene from './components/ConvenienceStoreScene'
 import DialoguePanel from './components/DialoguePanel'
 import { characters, catFeedback } from './data/characters'
 import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
-import { useNpcStates } from './hooks/useNpcStates.js'
-import { applyNpcStateEvent } from './game/npcStateTransitions.js'
 import { useNpcActivities } from './hooks/useNpcActivities.js'
 
-export default function App({ onNpcStateChange } = {}) {
+export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [catActive, setCatActive] = useState(false)
   const catTimer = useRef(null)
   const [histories, setHistories] = useState({ kai: [], mira: [] })
-  // Owned by App; only the selected NPC's pre-turn snapshot enters a request.
-  const npcRuntime = useNpcStates()
-  // Ambient behavior is independent of dialogue state and never enters /api/chat.
-  const ambientRuntime = useNpcActivities()
-
-  // Read-only observer for the standalone development test fixture. No game UI.
-  useEffect(() => {
-    if (import.meta.env.DEV) onNpcStateChange?.(npcRuntime.npcStates)
-  }, [npcRuntime.npcStates, onNpcStateChange])
+  // Only the selected semantic activity enters dialogue; rendering state stays local.
+  const ambientRuntime = useNpcActivities({ interactingId: selectedId, catInteracting: catActive })
 
   function completeTurn(npc, message, reply) {
     setHistories(previous => ({
@@ -28,7 +19,6 @@ export default function App({ onNpcStateChange } = {}) {
       [npc]: [...previous[npc], { role: 'user', content: message },
         { role: 'assistant', content: reply }].slice(-MAX_HISTORY_MESSAGES),
     }))
-    npcRuntime.updateNpcState(npc, state => applyNpcStateEvent(npc, state, { type: 'dialogue_completed' }))
   }
 
   function closeDialogue() {
@@ -65,7 +55,7 @@ export default function App({ onNpcStateChange } = {}) {
         onCatMovementChange={ambientRuntime.movementObservers.cat} />
       <div className="interaction-area">
         {selectedId
-          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} npcState={npcRuntime.getNpcState(selectedId)} onComplete={completeTurn} onClose={closeDialogue} />
+          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} activity={ambientRuntime.activities[selectedId]} onComplete={completeTurn} onClose={closeDialogue} />
           : <div className="scene-invitation"><span>· · ·</span><p>No rush. The rain isn’t going anywhere.</p><small>点击角色，聊上几句</small></div>}
       </div>
     </div>

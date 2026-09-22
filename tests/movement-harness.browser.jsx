@@ -1,6 +1,5 @@
-import React, { act, StrictMode, useLayoutEffect } from 'react'
+import React, { act, StrictMode } from 'react'
 import MovementHarness from './MovementHarness.jsx'
-import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { finishMovement } from './finishMovement.js'
 import { getMovementDirection } from '../src/game/npcMovement.js'
 import { sceneWaypoints, sceneWaypointEdges } from '../src/data/sceneWaypoints.js'
@@ -8,18 +7,10 @@ import { sceneWaypoints, sceneWaypointEdges } from '../src/data/sceneWaypoints.j
 export async function verifyMovementHarness(root, container, check, intervalClock) {
   const originalFetch = window.fetch
   let requests = 0
-  let states
-  function StateWitness() {
-    const runtime = useNpcStates()
-    useLayoutEffect(() => { states = runtime })
-    return null
-  }
   window.fetch = async () => { requests++; throw new Error('Movement must not call an API') }
   const timerCount = intervalClock.timers.size
   try {
-    await act(async () => root.render(<StrictMode><StateWitness /><MovementHarness /></StrictMode>))
-    await act(async () => states.updateNpcState('kai', () => ({ trust: 2 })))
-    const before = JSON.stringify(states.npcStates)
+    await act(async () => root.render(<StrictMode><MovementHarness /></StrictMode>))
     const background = container.querySelector('.scene-art').outerHTML
     const others = [...container.querySelectorAll('.npc-mira, .npc-cat')].map(node => node.outerHTML)
     check(!container.querySelector('.route-debug'), 'route debug is off by default')
@@ -66,7 +57,6 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
       await finish()
       check(entity.querySelector('.kai-visual').dataset.phase === 'idle', 'real CSS arrival and brief settle finish in idle')
     }
-    check(JSON.stringify(states.npcStates) === before, 'debug movement preserves relationship state')
     check(intervalClock.timers.size === timerCount, 'debug harness installs or changes no ambient intervals')
     check(requests === 0, 'debug movement makes no chat or other API calls')
     check(container.querySelector('.scene-art').outerHTML === background, 'debug controls reuse unchanged production scene')
@@ -88,7 +78,7 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
       await finishMovement([entity])
     }
     check([...container.querySelectorAll('.npc-kai, .npc-cat')].every((node, index) => node.outerHTML === untouched[index]), 'Mira controls preserve accepted Kai and Cat entities')
-    check(requests === 0 && JSON.stringify(states.npcStates) === before && intervalClock.timers.size === timerCount, 'Mira harness changes no API, relationship state or ambient timing')
+    check(requests === 0 && intervalClock.timers.size === timerCount, 'Mira harness changes no API or ambient timing')
     const humans = [...container.querySelectorAll('.npc-kai, .npc-mira')].map(node => node.outerHTML)
     await act(async () => {
       const selector = container.querySelector('select')
@@ -116,7 +106,7 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
       check(cat.querySelector('.cat-visual').dataset.phase === 'idle', 'Cat harness reaches activity destination')
     }
     check([...container.querySelectorAll('.npc-kai, .npc-mira')].every((node, index) => node.outerHTML === humans[index]), 'Cat harness leaves both human entities unchanged')
-    check(requests === 0 && JSON.stringify(states.npcStates) === before && intervalClock.timers.size === timerCount, 'Cat harness changes no API, relationship state or ambient timing')
+    check(requests === 0 && intervalClock.timers.size === timerCount, 'Cat harness changes no API or ambient timing')
 
   } finally {
     await act(async () => root.render(null))

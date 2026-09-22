@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import { ambientNpcIds, npcActivities, createInitialNpcActivities } from '../src/data/npcActivities.js'
 import { nextNpcActivity } from '../src/game/npcActivityTransitions.js'
 import { npcActivityReducer } from '../src/hooks/useNpcActivities.js'
-import { createInitialNpcState } from '../src/data/npcState.js'
 import { sendChat } from '../src/lib/chat.js'
 
 test('initial activities are valid, session-local and immutable', () => {
@@ -63,9 +62,7 @@ test('unknown NPCs, mismatched activities and invalid actions are rejected', () 
   assert.deepEqual(initial, createInitialNpcActivities())
 })
 
-test('ambient state never enters chat payload or relationship state', async t => {
-  const states = createInitialNpcState()
-  const before = structuredClone(states)
+test('full ambient state map never enters chat payload', async t => {
   const activities = npcActivityReducer(createInitialNpcActivities(), { type: 'advance', npcId: 'kai' })
   const requests = []
   t.mock.method(globalThis, 'fetch', async (_, options) => {
@@ -73,8 +70,7 @@ test('ambient state never enters chat payload or relationship state', async t =>
     return Response.json({ reply: '嗯。' })
   })
   for (const npc of ['kai', 'mira']) {
-    await sendChat({ npc, message: '你好', history: [], npcState: states[npc], activities, currentActivity: activities[npc] })
+    await sendChat({ npc, message: '你好', history: [], activities, currentActivity: activities[npc] })
   }
-  assert.deepEqual(requests, ['kai', 'mira'].map(npc => ({ npc, message: '你好', history: [], npcState: states[npc] })))
-  assert.deepEqual(states, before)
+  assert.deepEqual(requests, ['kai', 'mira'].map(npc => ({ npc, message: '你好', history: [] })))
 })

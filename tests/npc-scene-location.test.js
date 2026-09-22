@@ -4,7 +4,6 @@ import { npcActivities, createInitialNpcActivities } from '../src/data/npcActivi
 import { npcActivityLocations, npcSceneLocations } from '../src/data/npcSceneLocations.js'
 import { getNpcSceneLocation } from '../src/game/npcSceneLocation.js'
 import { nextNpcActivity } from '../src/game/npcActivityTransitions.js'
-import { createInitialNpcState } from '../src/data/npcState.js'
 import { sendChat } from '../src/lib/chat.js'
 import { scene } from '../src/data/scene.js'
 
@@ -54,19 +53,17 @@ test('unknown NPCs cannot access location mappings', () => {
   }
 })
 
-test('derivation is isolated and does not mutate ambient or relationship snapshots', () => {
+test('derivation is isolated and does not mutate ambient snapshots', () => {
   const activities = createInitialNpcActivities()
-  const relationship = createInitialNpcState()
-  const before = structuredClone({ activities, relationship })
+  const before = structuredClone({ activities })
   const kaiActivity = nextNpcActivity('kai', activities.kai)
   assert.equal(getNpcSceneLocation('kai', kaiActivity), 'coffee_station')
   assert.equal(getNpcSceneLocation('mira', activities.mira), 'notes_spot')
   assert.equal(getNpcSceneLocation('cat', activities.cat), 'floor')
-  assert.deepEqual({ activities, relationship }, before)
+  assert.deepEqual({ activities }, before)
 })
 
-test('dialogue payload ignores activity and derived location for every dialogue NPC activity', async t => {
-  const relationship = createInitialNpcState()
+test('dialogue sends semantic activity but excludes derived locations for every NPC activity', async t => {
   const requests = []
   t.mock.method(globalThis, 'fetch', async (_, options) => {
     requests.push(JSON.parse(options.body))
@@ -75,7 +72,7 @@ test('dialogue payload ignores activity and derived location for every dialogue 
   for (const npc of ['kai', 'mira']) {
     for (const currentActivity of npcActivities[npc]) {
       const history = [{ role: 'user', content: '你好' }, { role: 'assistant', content: '嗯。' }]
-      const request = { npc, message: '雨还没停。', history, npcState: relationship[npc] }
+      const request = { npc, message: '雨还没停。', history, activity: currentActivity }
       await sendChat({ ...request, currentActivity, logicalLocation: getNpcSceneLocation(npc, currentActivity) })
       assert.deepEqual(requests.at(-1), request)
     }
