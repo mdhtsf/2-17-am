@@ -1,7 +1,7 @@
 import { getKaiSceneDepth, getHumanSceneDepth } from '../game/sceneDepth.js'
 
 // Bottom-center anchors in percentages of the full 1536 × 1024 scene, before cropping.
-// Kai can stand behind the counter foreground (layer 2); other destinations are in front.
+// Kai's hidden foot positions remain behind the scene-level counter foreground.
 export const npcSceneAnchors = Object.freeze({
   kai: Object.freeze({
     counter: Object.freeze({ x: 28.2, y: 54.5, ...getKaiSceneDepth({ y: 54.5, zone: 'counter' }) }),

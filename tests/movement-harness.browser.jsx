@@ -25,6 +25,7 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
     check(!container.querySelector('.route-debug'), 'route debug is off by default')
     await act(async () => container.querySelector('.movement-controls input').click())
     check(Boolean(container.querySelector('.route-debug')) && container.querySelectorAll('.route-edge').length === sceneWaypointEdges.length, 'development toggle displays the authored graph')
+    check(Boolean(container.querySelector('.counter-occlusion-debug')), 'route debug exposes the actual counter silhouette for visual alignment checks')
     const buttons = [...container.querySelectorAll('.movement-controls button')]
     check(buttons.length === 5, 'development harness exposes four real destinations and Next')
     for (let i = 1; i <= 4; i++) {

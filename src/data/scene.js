@@ -1,4 +1,5 @@
 import { npcs } from '../../shared/npcs.js'
+import { counterOcclusion } from './counterOcclusion.js'
 
 // Background framing and entity identities. Moving anchors live in npcSceneAnchors.js.
 export const scene = {
@@ -12,7 +13,7 @@ export const scene = {
     { id: 'cat', name: 'THE CAT' },
   ],
   // Reuse the untouched clean image for foreground occlusion, never baked character art.
-  counterOcclusion: 'polygon(17% 44.8%, 44.5% 33%, 46.8% 37.8%, 47.7% 48.3%, 19.4% 61.2%, 16.8% 58%)',
+  counterOcclusion,
   rainRegions: [
     'polygon(45.5% 0, 100% 0, 100% 38%, 45.5% 7%)',
     'polygon(88.5% 40%, 100% 45%, 100% 77%, 88.5% 67%)',

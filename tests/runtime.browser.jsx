@@ -9,6 +9,7 @@ import { verifySceneLocations, checkSceneEntities } from './scene-locations.brow
 import { verifyRoutes } from './routes.browser.jsx'
 import { verifyWalking } from './walking.browser.jsx'
 import { verifyMovementHarness } from './movement-harness.browser.jsx'
+import { verifyCounterFrames } from './counter-frames.browser.jsx'
 import '../src/styles.css'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -77,6 +78,7 @@ const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
 try {
+  await verifyCounterFrames(root, container, check)
   await verifyRoutes(root, container, check)
   await verifyRoutes(root, container, check, 'mira')
   await verifyMovementHarness(root, container, check, intervalClock)

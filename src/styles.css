@@ -110,7 +110,7 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 @keyframes rain-fall { from { translate: 0 -15px; opacity: 0; } 20% { opacity: .7; } to { translate: -12px 40px; opacity: 0; } }
 /* Background, independent sprites and their hit areas share one art-space box. */
 .npc-overlay { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
-.scene-foreground { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; image-rendering: pixelated; pointer-events: none; user-select: none; }
+.scene-foreground { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; image-rendering: pixelated; pointer-events: none; user-select: none; }
 .npc {
   position: absolute;
   border: 0;

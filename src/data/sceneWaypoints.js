@@ -10,7 +10,9 @@ export const sceneWaypoints = Object.freeze({
   counter: destination('counter', 'counter'),
   coffee_station: destination('coffee_station', 'counter'),
   counter_lane: point('counter_lane', 43, 48, 'counter'),
-  counter_exit: point('counter_exit', 49.5, 45.5),
+  // Clear the x=730 counter end with the widest accepted walking pose, not just
+  // the foot center. Same opening/graph; 30.72 art px farther right than before.
+  counter_exit: point('counter_exit', 51.5, 45.5),
   shelf: destination('shelf'),
   fridge_front: point('fridge_front', 62, 54),
   window_lane: point('window_lane', 72, 67),
@@ -44,5 +46,5 @@ export function getNpcWaypoint(npcId, location) {
 // A registry of actual reusable foreground layers, not imaginary z-index masks.
 // More masks can be registered here when the artwork supports them.
 export const sceneForegroundLayers = Object.freeze([
-  Object.freeze({ id: 'counter', zIndex: 2, mask: 'counterOcclusion' }),
+  Object.freeze({ id: 'counter', zIndex: 6, mask: 'counterOcclusion' }),
 ])

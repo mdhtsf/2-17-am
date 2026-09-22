@@ -1,4 +1,4 @@
-import { sceneForegroundLayers } from '../data/sceneWaypoints.js'
+import SceneForeground from './SceneForeground.jsx'
 import NPC from './NPC'
 import SceneBackground from './SceneBackground'
 import RainOverlay from './RainOverlay'
@@ -31,8 +31,8 @@ export default function ConvenienceStoreScene({ selectedId, onSelect, catActive,
             onSelect={npc.id === 'cat' ? onCat : () => onSelect(npc.id)}
           />
       })}
-      {sceneForegroundLayers.map(layer => <img key={layer.id} className="scene-foreground" src={scene.src} alt="" aria-hidden="true" draggable="false" style={{ clipPath: scene[layer.mask], zIndex: layer.zIndex }} />)}
     </div>
+    <SceneForeground scene={scene} />
     <div className="scene-vignette" aria-hidden="true" />
     {children}
   </section>

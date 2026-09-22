@@ -12,8 +12,8 @@ export function getHumanSceneDepth({ y, zone = 'floor' }) {
 // Compatibility for the accepted Kai configuration and regression fixtures.
 export const getKaiSceneDepth = getHumanSceneDepth
 
-// The actual counter foreground is layer 2. Remain behind it until the exit is
-// reached; on entry, its clip naturally masks only the overlapping body pixels.
+// Local ordering among NPCs only. The scene-level foreground separately masks
+// overlapping pixels throughout entry/exit, regardless of this local depth.
 export function getSegmentLayer(from, to) {
   return from.zone === 'counter' || to.zone === 'counter' ? 1 : getHumanSceneDepth(from).zIndex
 }

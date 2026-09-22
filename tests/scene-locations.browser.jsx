@@ -49,6 +49,18 @@ export async function verifySceneLocations(root, container, check) {
       background = container.querySelector('.scene-art').outerHTML
       check(container.querySelector('.scene-art').getAttribute('src') === '/assets/scenes/after-hours-clean.png', 'active background is the clean scene')
     }
+    const foreground = container.querySelector('.scene-foreground')
+    check(foreground.parentElement === container.querySelector('.scene')
+      && Number(getComputedStyle(foreground).zIndex) > Number(getComputedStyle(container.querySelector('.npc-overlay')).zIndex),
+      `scene step ${step}: foreground is above the entire NPC stacking context, including exit/floor sprites`)
+    const artBounds = container.querySelector('.scene-art').getBoundingClientRect()
+    const foregroundBounds = foreground.getBoundingClientRect()
+    check(['x', 'y', 'width', 'height'].every(key => Math.abs(artBounds[key] - foregroundBounds[key]) < .1),
+      `scene step ${step}: counter cutout registers exactly with background without a shifted strip`)
+    check(getComputedStyle(foreground).pointerEvents === 'none' && foreground.style.clipPath.startsWith('polygon('),
+      `scene step ${step}: counter mask is active and never intercepts NPC clicks`)
+    if (step < 2) check(Number(getComputedStyle(foreground).zIndex) > Number(nodes[0].style.zIndex),
+      `scene step ${step}: initial counter and coffee positions stay behind the foreground`)
     check(background === container.querySelector('.scene-art').outerHTML
       && !container.querySelector('img[src="/assets/scenes/after-hours.png"], img[src^="/art/"]'), `scene step ${step} preserves clean background without baked or legacy NPCs`)
     if (previousNodes) check(nodes.every((node, i) => node === previousNodes[i]), `scene step ${step} preserves entity identity without teleport remounts`)
