@@ -59,7 +59,10 @@ export default function App({ onNpcStateChange } = {}) {
     </header>
     <div className="world-viewport">
       <div className="location-caption" aria-hidden="true"><span className="moon">☾</span><div>AFTER HOURS<small>A small corner<br/>for the restless.</small></div></div>
-      <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} activities={ambientRuntime.activities} />
+      <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} activities={ambientRuntime.activities}
+        onKaiMovementChange={ambientRuntime.movementObservers.kai}
+        onMiraMovementChange={ambientRuntime.movementObservers.mira}
+        onCatMovementChange={ambientRuntime.movementObservers.cat} />
       <div className="interaction-area">
         {selectedId
           ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} npcState={npcRuntime.getNpcState(selectedId)} onComplete={completeTurn} onClose={closeDialogue} />

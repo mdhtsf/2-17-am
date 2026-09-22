@@ -1,5 +1,5 @@
+.dev-controls { position: fixed; z-index: 100; inset: auto 12px 12px; max-height: 45vh; overflow-y: auto; }
 .movement-controls {
-  position: fixed; z-index: 100; inset: auto 12px 12px;
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 12px; background: #101b27ee; border: 1px solid #9f8869;
   color: #eddbbe; font: 13px monospace;
@@ -18,3 +18,7 @@
 .route-status { flex-basis: 100%; overflow-wrap: anywhere; line-height: 1.5; }
 
 .shelf-occlusion-debug { fill: #8cafef20; stroke: #8cafef; stroke-width: 1.5; }
+
+.activity-controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: #151b24; color: #efdbb9; font: 12px monospace; }
+.activity-controls button { border: 1px solid #778491; background: #252c37; color: inherit; padding: 7px; font: inherit; cursor: pointer; }
+.activity-controls button[aria-pressed="true"] { border-color: #edc580; color: #edc580; }

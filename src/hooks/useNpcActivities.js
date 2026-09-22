@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useReducer } from 'react'
-import { ambientIntervals, ambientNpcIds, createInitialNpcActivities, requireNpcActivity } from '../data/npcActivities.js'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { ambientNpcIds, createInitialNpcActivities, requireNpcActivity } from '../data/npcActivities.js'
 import { nextNpcActivity } from '../game/npcActivityTransitions.js'
+import { createAmbientDirector } from '../game/ambientDirector.js'
 
 export function npcActivityReducer(activities, action) {
   if (action.type === 'reset') return createInitialNpcActivities()
@@ -13,8 +14,10 @@ export function npcActivityReducer(activities, action) {
     ? activities : Object.freeze({ ...activities, [action.npcId]: next })
 }
 
-export function useNpcActivities({ intervals = ambientIntervals } = {}) {
+export function useNpcActivities() {
   const [activities, dispatch] = useReducer(npcActivityReducer, undefined, createInitialNpcActivities)
+  const latest = useRef(activities)
+  useEffect(() => { latest.current = activities }, [activities])
   const getNpcActivity = useCallback(npcId => requireNpcActivity(npcId, activities[npcId]), [activities])
   const setNpcActivity = useCallback((npcId, activity) => {
     requireNpcActivity(npcId, activity)
@@ -26,18 +29,16 @@ export function useNpcActivities({ intervals = ambientIntervals } = {}) {
     dispatch({ type: 'advance', npcId })
   }, [])
   const resetNpcActivities = useCallback(() => dispatch({ type: 'reset' }), [])
-  const { kai, mira, cat } = intervals
-
+  const [director] = useState(() => createAmbientDirector({
+    getActivities: () => latest.current,
+    onActivity: (npcId, activity) => dispatch({ type: 'set', npcId, activity }),
+  }))
+  const [movementObservers] = useState(() => Object.fromEntries(ambientNpcIds.map(id =>
+    [id, movement => director.reportMovement(id, movement)])))
   useEffect(() => {
-    const delays = [kai, mira, cat]
-    // Check all delays before creating any timer, including in test configurations.
-    if (delays.some(delay => !Number.isInteger(delay) || delay <= 0 || delay > 2147483647)) {
-      throw new RangeError('Ambient intervals must be positive timer-safe milliseconds')
-    }
-    const timers = ambientNpcIds.map((npcId, index) =>
-      setInterval(() => advanceNpcActivity(npcId), delays[index]))
-    return () => timers.forEach(timer => clearInterval(timer))
-  }, [kai, mira, cat, advanceNpcActivity])
+    director.start()
+    return () => director.stop()
+  }, [director])
 
-  return { activities, getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities }
+  return { activities, getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities, movementObservers }
 }

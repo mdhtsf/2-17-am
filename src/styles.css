@@ -130,6 +130,10 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .walking-visual .npc-sprite { opacity: 1; transition: none; }
 .walking-visual[data-phase="walking"] .npc-sprite { opacity: 0; }
 .walking-visual[data-phase="settling"] .npc-sprite { transition: opacity var(--walk-settle) linear; }
+.walking-visual[data-activity-pose] .npc-sprite { opacity: 0; }
+.activity-sprite { position: absolute; left: 50%; overflow: hidden; pointer-events: none; }
+.activity-sprite img { position: absolute; max-width: none; height: auto; image-rendering: pixelated; user-select: none; -webkit-user-drag: none; }
+.walking-visual[data-phase="walking"] .activity-sprite { opacity: 0; }
 /* C-3 asset registration: 928 visible pixels, feet at y=968 in the same 351×988 idle canvas. */
 .walking-sprite {
   position: absolute; height: var(--walk-visible-height, 93.9271%); bottom: var(--walk-bottom, 2.025%); left: 50%;

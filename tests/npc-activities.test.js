@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ambientIntervals, ambientNpcIds, npcActivities, createInitialNpcActivities } from '../src/data/npcActivities.js'
+import { ambientNpcIds, npcActivities, createInitialNpcActivities } from '../src/data/npcActivities.js'
 import { nextNpcActivity } from '../src/game/npcActivityTransitions.js'
 import { npcActivityReducer } from '../src/hooks/useNpcActivities.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
@@ -12,8 +12,6 @@ test('initial activities are valid, session-local and immutable', () => {
   assert.notEqual(initial, createInitialNpcActivities())
   assert.throws(() => { initial.kai = 'sleeping' }, TypeError)
   assert.throws(() => { npcActivities.kai.push('sleeping') }, TypeError)
-  assert.equal(new Set(Object.values(ambientIntervals)).size, 3)
-  assert.ok(Object.values(ambientIntervals).every(delay => delay >= 30000 && delay < 120000))
 })
 
 for (const npcId of ambientNpcIds) {

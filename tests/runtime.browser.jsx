@@ -1,3 +1,4 @@
+import { verifyActivityVisuals } from './activity-visuals.browser.jsx'
 import { verifyShelfOcclusion } from './shelf-occlusion.browser.jsx'
 import { verifyCatMovement } from './cat-movement.browser.jsx'
 // Standalone test page only; never imported by the game or production build.
@@ -6,7 +7,7 @@ import { createRoot } from 'react-dom/client'
 import App from '../src/App.jsx'
 import { useNpcStates } from '../src/hooks/useNpcStates.js'
 import { createInitialNpcState } from '../src/data/npcState.js'
-import { installIntervalClock, verifyAmbientRuntime } from './ambient.browser.jsx'
+import { installAmbientClock, verifyAmbientRuntime } from './ambient.browser.jsx'
 import { verifySceneLocations, checkSceneEntities } from './scene-locations.browser.jsx'
 import { verifyRoutes } from './routes.browser.jsx'
 import { verifyWalking } from './walking.browser.jsx'
@@ -18,7 +19,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const output = document.getElementById('results')
 const container = document.getElementById('test-root')
 const root = createRoot(container)
-const intervalClock = installIntervalClock()
+const intervalClock = installAmbientClock()
 const checks = []
 const check = (condition, label) => {
   if (!condition) throw new Error(label)
@@ -80,6 +81,7 @@ const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
 try {
+  await verifyActivityVisuals(root, container, check)
   await verifyShelfOcclusion(root, container, check)
   await verifyCatMovement(root, container, check)
   await verifyCounterFrames(root, container, check)
@@ -89,7 +91,7 @@ try {
   await verifyWalking(root, container, check)
   await verifyWalking(root, container, check, 'mira')
   await verifySceneLocations(root, container, check)
-  await verifyAmbientRuntime(root, check, intervalClock)
+  await verifyAmbientRuntime(root, container, check, intervalClock)
   await act(async () => root.render(<RuntimeHarness />))
   check(JSON.stringify(runtime.npcStates) === JSON.stringify(createInitialNpcState()), 'React initializes both NPC states')
   await act(async () => {
@@ -111,8 +113,8 @@ try {
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'counter,notes_spot,floor', 'App initial scene derives locations from initial activities')
   const sceneBefore = container.querySelector('.scene-art').outerHTML
   const positionsBefore = [...container.querySelectorAll('.npc')].map(node => node.getAttribute('style')).join('|')
-  await intervalClock.tick(71000)
-  check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'making_coffee,checking_phone,grooming', 'App passes independently advancing activities into scene hotspots')
+  await intervalClock.tick(8000)
+  check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'making_coffee,reading_notes,sleeping', 'App director changes exactly one activity through scene hotspots')
   check([...container.querySelectorAll('.npc')].map(node => node.dataset.location).join(',') === 'coffee_station,notes_spot,floor', 'App timer advances derived locations without storing another state')
   checkState(0, 0, 'automatic ambient ticks do not change relationship state')
   check(requests.length === 0, 'automatic ambient ticks never request dialogue')
@@ -223,7 +225,7 @@ try {
   checkState(5, 4, 'Cat does not change NPC state')
   check(requests.length === requestsBeforeCat, 'moving Cat interaction remains local-only')
   await act(async () => root.render(<App key="new-page-session" onNpcStateChange={observeState} />))
-  check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'behind_counter,reading_notes,sleeping' && intervalClock.timers.size === 3, 'App remount resets all activities and replaces old timers')
+  check([...container.querySelectorAll('.npc')].map(node => node.dataset.activity).join(',') === 'behind_counter,reading_notes,sleeping' && intervalClock.timers.size === 1, 'App remount resets all activities and replaces old timers')
   checkState(0, 0, 'new App lifetime resets encounter and familiarity')
   await click('.npc-kai')
   await say('新一轮')
@@ -236,8 +238,8 @@ try {
   output.textContent = JSON.stringify({ passed: checks.length, error: error.message, checks }, null, 2)
 } finally {
   await act(async () => root.unmount())
-  intervalClock.restore()
   window.fetch = originalFetch
   window.setTimeout = originalSetTimeout
+  intervalClock.restore()
   delete globalThis.IS_REACT_ACT_ENVIRONMENT
 }

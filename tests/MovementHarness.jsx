@@ -27,6 +27,7 @@ export default function MovementHarness() {
       onKaiMovementChange={setKaiMovement} onMiraMovementChange={setMiraMovement} onCatMovementChange={setCatMovement}>
       {showRoute && <RouteDebug movement={movement} npcId={npcId} />}
     </ConvenienceStoreScene>
+    <div className="dev-controls">
     <nav className="movement-controls" aria-label={`${npcId === 'kai' ? 'Kai' : npcId === 'mira' ? 'Mira' : 'Cat'} movement test`}>
       <strong>{npcId.toUpperCase()} · MOVEMENT TEST</strong>
       <select aria-label="Test NPC" value={npcId} onChange={event => setNpcId(event.target.value)}>
@@ -41,5 +42,11 @@ export default function MovementHarness() {
         <br />Segment: {movement?.segmentFrom || '—'} → {movement?.segmentTo || '—'}</output>}
       <small>Development only · 点击目的地立即移动 · 无环境计时器、对话或 API 请求</small>
     </nav>
+    {npcId !== 'cat' && <nav className="activity-controls" aria-label={`${npcId} activity poses`}>
+      <strong>ACTIVITY POSES</strong>
+      {npcActivities[npcId].map(item => <button key={item} aria-pressed={activity === item}
+        onClick={() => setActivity(item)}>{item}</button>)}
+    </nav>}
+    </div>
   </>
 }

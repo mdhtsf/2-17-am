@@ -499,7 +499,7 @@ E-0 的静态轮廓修正并不足够。后续录像和连续帧检查发现：�
 
 ### Stage 4.2E — Cat Movement Integration
 
-Cat 现在复用 `useNpcMovement`、现有 waypoint 图、逐段路线与 latest-target-wins 中断处理。活动仍为 sleeping / grooming → floor、watching_door → door、wandering → aisle；同地点只切换姿态，不制造移动。整条路线保持 walking，到达后恢复当前活动姿态。活动调度、对话、关系状态及 API payload 没有改变，activity-aware dialogue 仍留给 Stage 4.3。
+Cat 现在复用 `useNpcMovement`、现有 waypoint 图、逐段路线与 latest-target-wins 中断处理。活动仍为 sleeping / grooming → floor、watching_door → door、wandering → aisle；同地点只切换姿态，不制造移动。整条路线保持 walking，到达后恢复当前活动姿态。活动调度、对话、关系状态及 API payload 没有改变，activity-aware dialogue 仍留给 Stage 4.5。
 
 `src/data/catVisuals.js` 集中配置猫的四足素材与移动参数：125 art px/s、4 帧、8 FPS、125ms 到达整理；独立 224×192 画布统一底部中心着地。睡觉、梳毛、看门及站立使用静态姿态，侧面/正面/背面使用各四帧行走图。素材来源和注册方法见 `public/assets/npcs/cat/README.md`。旧 Cat 图和所有 Kai/Mira 图保持不变；猫可见休息宽度仍为场景的 6.12%，透视在 .85–1.05 范围内变化。
 
@@ -518,6 +518,43 @@ Cat 现在复用 `useNpcMovement`、现有 waypoint 图、逐段路线与 latest
 新增 Node 几何覆盖/留空及路线保护测试；浏览器在 900/390px 场景宽度下，对双向整条路线采样 60Hz 的实际 CSS 遮罩、绘制顺序和脚底位置。197 项 Node 测试、793 项浏览器/runtime 检查及生产构建通过；另录取正向 82、反向 85 张连续画面，检查入口、中段与出口，Console 无 error/warning。Kai/Mira 移动、Cat 动画与柜台回归保持通过。
 
 限制：本遮罩只针对当前近景货架和已标定通道，不是通用三维深度/碰撞系统；其他未分层家具仍是平面图。没有进入 Stage 4.3，没有 commit、tag 或 push。
+
+### Stage 4.3 — Ambient Activity Director
+
+`src/game/ambientDirector.js` 现在统一决定何时、由谁切换活动，取代 Stage 4.1 的三个独立固定 interval。`useNpcActivities` 继续持有活动状态；App 将既有 NPC movement observer 接到 Director，移动实现、路线、精灵、遮挡和对话保持原样。
+
+- 场景就绪后首次随机等待 **8–14 秒**；之后在角色到达且 settling 结束后重新随机等待 **16–28 秒**。全场最多一个 timeout，不补发积压事件。
+- 活动派发前立即保留一个事件，直到对应目的地收到 idle 确认为止。任一角色 walking / settling 时均不安排新事件；旧目的地的 idle 回报不能提前释放保留事件。同地点活动和 reduced motion 可直接以 idle 完成。
+- 不连续选择同一 NPC；最近两个事件中的其他角色权重为 **0.35**，其余为 **1**。这是按事件冷却的加权随机，不是强制轮班。
+- 排除当前活动，沿既有 waypoint route 累加原图像素距离：**≤400px 权重4、≤900px 权重2、>900px 权重0.5**。原地切换归入短距离；长路线仍可选，但概率较低。活动→地点映射完全不变。
+- 状态仅在 React 会话内存在。没有新增 UI、素材、依赖、持久化或 API 数据；活动专属美术留给 Stage 4.4，活动感知对话留给 Stage 4.5。
+
+验证：`node --test tests/*.test.js` **202 项通过**；`/tests/runtime.browser.html` **796 项通过**，包括真实移动期间阻塞、到达后恢复、Mira/Cat 原地切换、Strict Mode/卸载清理，以及 Kai/Mira/Cat 移动、柜台/货架遮挡和原有对话回归。Browser Console 无 error/warning，`npm run build` 通过。
+
+验收自动调度请打开正常首页；`/tests/movement.html` 仍是无自动调度的手动路线测试页。限制：这是简单的概率节奏控制，不保证每个短观察窗口内平均出场，也不保证完全杜绝连续的长距离行程；后台标签页可能受浏览器 timer 节流而延后。不新增动态避障、专属活动美术或活动感知对话。
+
+### Stage 4.4 — Activity Visual Interaction
+
+新增两张透明 RGBA 活动姿态图集（Kai 三格、Mira 四格），原有 idle / walking PNG 保持不变。完整生成提示词、来源与尺寸登记见 `public/assets/npcs/activities/README.md`；使用内置 image_gen，以现有 Kai/Mira 为风格和身份参考，没有下载第三方游戏素材或引入依赖。
+
+| NPC | Activity | 到达后的视觉 |
+| --- | --- | --- |
+| Kai | behind_counter | 原有柜台 idle |
+| Kai | making_coffee | 咖啡壶向杯中倒咖啡 |
+| Kai | checking_shelf | 持纸盒、伸手整理商品 |
+| Kai | looking_out_window | 侧后方看窗外 |
+| Mira | reading_notes | 持笔在打开的笔记本上工作 |
+| Mira | checking_phone | 低头查看手机 |
+| Mira | choosing_drink | 举起饮料瓶查看 |
+| Mira | staring_out_window | 背包朝向镜头、看窗外 |
+
+`npcActivityVisuals.js` 集中管理映射与像素登记，`ActivitySprite.jsx` 裁剪单格；`WalkingSprite` 继续使用原有 idle 图片保留布局，只在非 walking 阶段显示当前活动姿态。行走和路线各段持续用现有行走帧，到达后直接切姿态，原地活动变化不触发假移动。每格按鞋底中心、可见身高登记到既有画布，不改 base scale、透视或 world anchor。未新增 working_on_paper 等活动；reading_notes 本身表达研究生工作状态。
+
+手动验收：`/tests/movement.html` 选择 Kai/Mira，使用 **ACTIVITY POSES** 下方的四个按钮。保留原有目的地按钮与 Next，Cat 面板保持原样；整组调试控件固定在开发页底部并可滚动，不出现在生产页面。自动节奏仍使用 Stage 4.3 Director，未改任何调度配置或路线。
+
+验证：207 项 Node 测试、880 项浏览器检查通过，生产构建通过，Console 无 error/warning。覆盖完整活动映射、PNG 尺寸/alpha、脚底和可见高度登记、每段行走隐藏活动图、到达显示、原地切换，以及既有 Director、Kai/Mira/Cat、柜台/货架遮挡和对话回归。
+
+视觉限制：本轮是静态动作，不模拟真实拿取／摆放物品；手与机器、货架格位没有物理约束。新姿态的轮廓和头身观感仍可能与原 idle 有轻微差别，虽然脚底和可见高度已统一。没有活动循环动画，也没有把活动状态接入对话；Stage 4.5 未开始。未 commit、tag 或 push。
 
 ## 当前美术边界
 
