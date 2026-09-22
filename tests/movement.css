@@ -16,3 +16,5 @@
 .route-debug circle { fill: #fff3a8; stroke: #162230; stroke-width: 2; }
 .route-debug text { font: 14px monospace; fill: #fff3a8; paint-order: stroke; stroke: #101b27; stroke-width: 3; }
 .route-status { flex-basis: 100%; overflow-wrap: anywhere; line-height: 1.5; }
+
+.shelf-occlusion-debug { fill: #8cafef20; stroke: #8cafef; stroke-width: 1.5; }

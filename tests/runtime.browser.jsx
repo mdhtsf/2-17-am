@@ -1,3 +1,5 @@
+import { verifyShelfOcclusion } from './shelf-occlusion.browser.jsx'
+import { verifyCatMovement } from './cat-movement.browser.jsx'
 // Standalone test page only; never imported by the game or production build.
 import React, { act, useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -78,6 +80,8 @@ const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
 try {
+  await verifyShelfOcclusion(root, container, check)
+  await verifyCatMovement(root, container, check)
   await verifyCounterFrames(root, container, check)
   await verifyRoutes(root, container, check)
   await verifyRoutes(root, container, check, 'mira')

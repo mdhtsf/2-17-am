@@ -497,6 +497,28 @@ E-0 的静态轮廓修正并不足够。后续录像和连续帧检查发现：�
 
 没有修改 waypoint、anchor、切换阈值、素材或角色尺寸。增加亮边采样点与外侧空隙保护测试；真实浏览器逐帧检查增加 counter ↔ window 和重复 counter ↔ shelf，以及边线上实际 clip-path 命中检查。165 项 Node 测试、637 项浏览器检查、生产构建通过；另检查咖啡台往返、开放区往返、窗边路线及重复出口过程的 100 张连续画面。柜台仍是针对当前固定场景标定的二维遮罩，未扩展其他家具遮挡或 Cat 移动；没有 commit、tag 或 push。
 
+### Stage 4.2E — Cat Movement Integration
+
+Cat 现在复用 `useNpcMovement`、现有 waypoint 图、逐段路线与 latest-target-wins 中断处理。活动仍为 sleeping / grooming → floor、watching_door → door、wandering → aisle；同地点只切换姿态，不制造移动。整条路线保持 walking，到达后恢复当前活动姿态。活动调度、对话、关系状态及 API payload 没有改变，activity-aware dialogue 仍留给 Stage 4.3。
+
+`src/data/catVisuals.js` 集中配置猫的四足素材与移动参数：125 art px/s、4 帧、8 FPS、125ms 到达整理；独立 224×192 画布统一底部中心着地。睡觉、梳毛、看门及站立使用静态姿态，侧面/正面/背面使用各四帧行走图。素材来源和注册方法见 `public/assets/npcs/cat/README.md`。旧 Cat 图和所有 Kai/Mira 图保持不变；猫可见休息宽度仍为场景的 6.12%，透视在 .85–1.05 范围内变化。
+
+路线从 cat_aisle → cat_floor → cat_shelf_corner → cat_front_lane → cat_outer_lane → cat_door 接入 door_lane，仅有一个与共享图的连接，不改变人形路线。校准 Cat 的 shelf_corner 为 (39.5%,65%)，新增前侧 (62%,87.5%) 与外侧 (70%,85%) 通道，从货架前方走向门口；floor/door/aisle 的原坐标保持。Kai 的柜台遮罩完全不变，Kai/Mira 的速度、比例及步态不变。
+
+开发页面 `/tests/movement.html` 的 NPC selector 现在含 Cat，可立即触发 floor/sleeping、floor/grooming、door/watching_door、aisle/wandering、Next，并查看同一套路线调试。生产页面不显示这些控制。新增 Cat 路线、同地点、姿态、步态、透视锚点、中断和无 API 调用回归。193 项 Node 测试、730 项浏览器/runtime 检查与生产构建通过，Console 无 error/warning。
+
+限制：货架仍是平面背景，狭窄通道没有独立货架前景遮罩，不能声称完整物理遮挡；四帧步态的接地、转向及最终动画真实感仍待后续 polish。没有新增寻路引擎、物理或依赖，没有进入 Stage 4.3。
+
+### Stage 4.2E — Shelf Occlusion Correction
+
+人工验收发现 grooming/floor ↔ watching_door/door 路线上，近景货架的标牌和商品没有前景层，Cat 会盖在它们上面。新增 `src/data/shelfOcclusion.js`，沿原图近景商品架的包装顶部、斜标牌、纸盒阶梯、端头瓶盖及货架外沿描边（1536×1024 坐标，约 x=492–923、y=645–1024）。通过既有 `SceneForeground` 注册第二个 `merchandise-shelf` 裁剪层，复用原始背景像素，与场景严格同框；不使用矩形、不生成或修改 PNG、不覆盖后方中央货架及通道地面。
+
+本修正不改路线、waypoint、Cat 的活动/尺度/锚点/速度/动画，也不改 Kai/Mira 或已验收的柜台遮罩。开发页继续选择 Cat 后点击 floor/grooming → door/watching_door → floor/grooming 即可重放；Show route debug 额外显示蓝色货架轮廓，仅开发页可见。
+
+新增 Node 几何覆盖/留空及路线保护测试；浏览器在 900/390px 场景宽度下，对双向整条路线采样 60Hz 的实际 CSS 遮罩、绘制顺序和脚底位置。197 项 Node 测试、793 项浏览器/runtime 检查及生产构建通过；另录取正向 82、反向 85 张连续画面，检查入口、中段与出口，Console 无 error/warning。Kai/Mira 移动、Cat 动画与柜台回归保持通过。
+
+限制：本遮罩只针对当前近景货架和已标定通道，不是通用三维深度/碰撞系统；其他未分层家具仍是平面图。没有进入 Stage 4.3，没有 commit、tag 或 push。
+
 ## 当前美术边界
 
 背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动；Kai 和 Mira 在移动中播放行走帧。动态来自 CSS 雨层、位置过渡和人形步态。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡。Kai 和 Mira 近似匀速，受四帧素材和周期取整影响，步幅与实际地面位移仍可能略有差异；两人沿手工通道绕行主要家具，但没有动态避障或方向对应的站立姿势。

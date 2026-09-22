@@ -123,7 +123,7 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
   transform-origin: center bottom;
   transition: left 2.4s ease-in-out, top 2.4s ease-in-out, transform 2.4s ease-in-out;
 }
-.npc-kai, .npc-mira { transition: left var(--npc-move-duration, 0ms) linear, top var(--npc-move-duration, 0ms) linear, transform var(--npc-move-duration, 0ms) linear; }
+.npc-kai, .npc-mira, .npc-cat { transition: left var(--npc-move-duration, 0ms) linear, top var(--npc-move-duration, 0ms) linear, transform var(--npc-move-duration, 0ms) linear; }
 .npc-sprite { display: block; width: 100%; height: auto; image-rendering: pixelated; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .walking-visual { display: block; position: relative; z-index: 1; pointer-events: none; }
 .npc-ground-shadow { position: absolute; z-index: 0; left: 50%; bottom: 1.5%; width: 70%; height: 3.5%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, #09121b35 0%, #09121b18 45%, transparent 72%); pointer-events: none; }
@@ -293,3 +293,10 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .request-status { height: 14px; color: var(--gold); font-size: 12px; }
 .dialogue-error { color: #cfb39a; font-size: 11px; line-height: 1.6; margin: 4px 0 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Cat sheets use fixed 224×192 cells, with all paws on the bottom ground line. */
+.cat-walk { position: absolute; inset: 0; overflow: hidden; transform: scaleX(var(--cat-mirror)); }
+.cat-walk img { display: block; width: 400%; max-width: none; height: 100%; image-rendering: pixelated;
+  animation: cat-steps var(--cat-cycle) steps(4, end) infinite; }
+@keyframes cat-steps { to { transform: translateX(-100%); } }
+@media (prefers-reduced-motion: reduce) { .cat-walk img { animation: none; } }

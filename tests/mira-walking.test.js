@@ -37,7 +37,7 @@ test('Mira activity semantics and shared human cadence are preserved', () => {
   assert.equal(HUMAN_MOVEMENT, KAI_MOVEMENT)
   assert.equal(getNpcWaypoint('kai','window'), 'window')
   assert.equal(getNpcWaypoint('mira','window'), 'mira_window')
-  for(const [npc, location] of [['cat','floor'],['mira','counter'],['kai','notes_spot'],['mira','__proto__']]) {
+  for(const [npc, location] of [['cat','counter'],['mira','counter'],['kai','notes_spot'],['mira','__proto__']]) {
     assert.throws(() => getNpcWaypoint(npc,location), RangeError)
   }
 })

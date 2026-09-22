@@ -1,3 +1,4 @@
+import { getCatPose } from '../src/data/catVisuals.js'
 import { finishMovement } from './finishMovement.js'
 import { sceneWaypoints } from '../src/data/sceneWaypoints.js'
 import { getSegmentLayer } from '../src/game/sceneDepth.js'
@@ -21,7 +22,7 @@ export function checkSceneEntities(container, check, label) {
     return node.style.left === `${anchor.x}%` && node.style.top === `${anchor.y}%`
       && node.style.getPropertyValue('--npc-scale') === String(anchor.scale)
       && node.style.zIndex === String(layer)
-      && node.querySelector('.npc-sprite').getAttribute('src') === npcVisuals[id].src
+      && node.querySelector('.npc-sprite').getAttribute('src') === (id === 'cat' ? getCatPose(node.dataset.activity) : npcVisuals[id].src)
       && Boolean(node.querySelector('.npc-label'))
   }), `${label}: each sprite, label and hitbox share the derived anchor`)
 }

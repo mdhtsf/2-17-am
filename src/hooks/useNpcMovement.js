@@ -8,7 +8,7 @@ const IDLE = { direction: null, phase: 'idle', segment: 0, route: [] }
 
 // Navigation progress is transient presentation state: a node / occupied edge,
 // never another world position. Logical destination still derives from activity.
-export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcId = 'kai') {
+export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcId = 'kai', config = HUMAN_MOVEMENT) {
   const previous = useRef(null)
   const progress = useRef({ node: null, edge: null })
   const segment = useRef(0)
@@ -47,7 +47,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
     const occupiedEdge = progress.current.edge
     const origin = readPosition()
     // Bare anchors remain supported for the isolated segment renderer tests.
-    // Every production human entity provides a validated logical destination.
+    // Every production moving entity provides a validated logical destination.
     const route = logicalLocation
       ? occupiedEdge
         ? resolveInterruptedRoute(...occupiedEdge, origin, destination)
@@ -70,7 +70,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
     const settle = () => {
       phase = 'settling'
       setMovement({ ...current, phase })
-      timer = window.setTimeout(idle, HUMAN_MOVEMENT.settleMs)
+      timer = window.setTimeout(idle, config.settleMs)
     }
     const startSegment = () => {
       if (disposed) return
@@ -79,7 +79,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
       const next = route[index]
       const position = readPosition()
       const direction = getMovementDirection(position, next)
-      const duration = getMovementDuration(position, next)
+      const duration = getMovementDuration(position, next, config)
       const fromId = index === 0 && occupiedEdge
         ? occupiedEdge.find(id => id !== next.id)
         : progress.current.node
@@ -115,7 +115,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
         startSegment() // No idle / settle between waypoints.
       }
       if (!duration) { finishSegment(); return }
-      timer = window.setTimeout(finishSegment, duration + HUMAN_MOVEMENT.completionGraceMs)
+      timer = window.setTimeout(finishSegment, duration + config.completionGraceMs)
     }
     const onArrival = event => {
       if (event.target !== entity || !['left', 'top'].includes(event.propertyName)) return
@@ -136,7 +136,7 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
       entity.removeEventListener('transitionend', onArrival)
       reducedMotion.removeEventListener('change', onPreferenceChange)
     }
-  }, [anchor.x, anchor.y, entityRef, enabled, logicalLocation, npcId])
+  }, [anchor.x, anchor.y, entityRef, enabled, logicalLocation, npcId, config])
 
   return movement
 }

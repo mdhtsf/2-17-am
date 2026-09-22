@@ -25,6 +25,7 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
     check(!container.querySelector('.route-debug'), 'route debug is off by default')
     await act(async () => container.querySelector('.movement-controls input').click())
     check(Boolean(container.querySelector('.route-debug')) && container.querySelectorAll('.route-edge').length === sceneWaypointEdges.length, 'development toggle displays the authored graph')
+    check(Boolean(container.querySelector('.shelf-occlusion-debug')), 'route debug exposes the near-shelf merchandise silhouette')
     check(Boolean(container.querySelector('.counter-occlusion-debug')), 'route debug exposes the actual counter silhouette for visual alignment checks')
     const buttons = [...container.querySelectorAll('.movement-controls button')]
     check(buttons.length === 5, 'development harness exposes four real destinations and Next')
@@ -88,6 +89,35 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
     }
     check([...container.querySelectorAll('.npc-kai, .npc-cat')].every((node, index) => node.outerHTML === untouched[index]), 'Mira controls preserve accepted Kai and Cat entities')
     check(requests === 0 && JSON.stringify(states.npcStates) === before && intervalClock.timers.size === timerCount, 'Mira harness changes no API, relationship state or ambient timing')
+    const humans = [...container.querySelectorAll('.npc-kai, .npc-mira')].map(node => node.outerHTML)
+    await act(async () => {
+      const selector = container.querySelector('select')
+      selector.value = 'cat'
+      selector.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    const catButtons = [...container.querySelectorAll('.movement-controls button')]
+    check(catButtons.map(button => button.textContent).join(',') === 'floor / sleeping,floor / grooming,door / watching_door,aisle / wandering,Next →',
+      'Cat harness exposes all four activities, including both floor poses, and Next')
+    check(container.querySelector('.route-debug').getAttribute('aria-label') === 'Cat waypoint graph', 'route debug supports Cat')
+    const cat = container.querySelector('.npc-cat')
+    await act(async () => catButtons[1].click())
+    check(cat.dataset.activity === 'grooming' && cat.getAnimations().length === 0, 'Cat grooming control changes pose without moving')
+    for (const index of [2, 3, 0, 4]) {
+      await act(async () => catButtons[index].click())
+      check(cat.dataset.activity === ['sleeping', 'grooming', 'watching_door', 'wandering', 'grooming'][index], 'Cat harness immediately changes activity')
+      // Drive existing CSS transitions to completion; no real ambient waiting.
+      for (let step = 0; step < 12 && cat.querySelector('.cat-visual').dataset.phase === 'walking'; step++) {
+        await act(async () => {
+          cat.getAnimations().forEach(animation => animation.finish())
+          await new Promise(resolve => setTimeout(resolve, 35))
+        })
+      }
+      await finishMovement([cat])
+      check(cat.querySelector('.cat-visual').dataset.phase === 'idle', 'Cat harness reaches activity destination')
+    }
+    check([...container.querySelectorAll('.npc-kai, .npc-mira')].every((node, index) => node.outerHTML === humans[index]), 'Cat harness leaves both human entities unchanged')
+    check(requests === 0 && JSON.stringify(states.npcStates) === before && intervalClock.timers.size === timerCount, 'Cat harness changes no API, relationship state or ambient timing')
+
   } finally {
     await act(async () => root.render(null))
     window.fetch = originalFetch

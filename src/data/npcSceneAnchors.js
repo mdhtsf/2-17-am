@@ -1,4 +1,4 @@
-import { getKaiSceneDepth, getHumanSceneDepth } from '../game/sceneDepth.js'
+import { getKaiSceneDepth, getHumanSceneDepth, getCatSceneDepth } from '../game/sceneDepth.js'
 
 // Bottom-center anchors in percentages of the full 1536 × 1024 scene, before cropping.
 // Kai's hidden foot positions remain behind the scene-level counter foreground.
@@ -16,9 +16,9 @@ export const npcSceneAnchors = Object.freeze({
     window: Object.freeze({ x: 75.5, y: 72.5, ...getHumanSceneDepth({ y: 72.5 }) }),
   }),
   cat: Object.freeze({
-    floor: Object.freeze({ x: 32.8, y: 64.5, scale: 1, zIndex: 4 }),
-    shelf_corner: Object.freeze({ x: 39.5, y: 68, scale: 0.95, zIndex: 4 }),
-    door: Object.freeze({ x: 83, y: 80, scale: 1.05, zIndex: 5 }),
-    aisle: Object.freeze({ x: 39, y: 59, scale: 0.85, zIndex: 3 }),
+    floor: Object.freeze({ x: 32.8, y: 64.5, ...getCatSceneDepth({ y: 64.5 }) }),
+    shelf_corner: Object.freeze({ x: 39.5, y: 65, ...getCatSceneDepth({ y: 65 }) }),
+    door: Object.freeze({ x: 83, y: 80, ...getCatSceneDepth({ y: 80 }) }),
+    aisle: Object.freeze({ x: 39, y: 59, ...getCatSceneDepth({ y: 59 }) }),
   }),
 })

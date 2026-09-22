@@ -13,9 +13,10 @@ export default function MovementHarness() {
   const [showRoute, setShowRoute] = useState(false)
   const [kaiMovement, setKaiMovement] = useState(null)
   const [miraMovement, setMiraMovement] = useState(null)
-  const movement = npcId === 'kai' ? kaiMovement : miraMovement
+  const [catMovement, setCatMovement] = useState(null)
+  const movement = { kai: kaiMovement, mira: miraMovement, cat: catMovement }[npcId]
   // One button per actual activity destination (notes and phone share a spot).
-  const cycle = npcActivities[npcId].filter((item, index, all) => all.findIndex(other =>
+  const cycle = npcId === 'cat' ? npcActivities.cat : npcActivities[npcId].filter((item, index, all) => all.findIndex(other =>
     getNpcSceneLocation(npcId, other) === getNpcSceneLocation(npcId, item)) === index)
   const activity = activities[npcId]
   const setActivity = value => setActivities(current => ({ ...current, [npcId]: value }))
@@ -23,16 +24,16 @@ export default function MovementHarness() {
   return <>
     <ConvenienceStoreScene activities={activities}
       selectedId={null} catActive={false} onSelect={() => {}} onCat={() => {}}
-      onKaiMovementChange={setKaiMovement} onMiraMovementChange={setMiraMovement}>
+      onKaiMovementChange={setKaiMovement} onMiraMovementChange={setMiraMovement} onCatMovementChange={setCatMovement}>
       {showRoute && <RouteDebug movement={movement} npcId={npcId} />}
     </ConvenienceStoreScene>
-    <nav className="movement-controls" aria-label={`${npcId === 'kai' ? 'Kai' : 'Mira'} movement test`}>
+    <nav className="movement-controls" aria-label={`${npcId === 'kai' ? 'Kai' : npcId === 'mira' ? 'Mira' : 'Cat'} movement test`}>
       <strong>{npcId.toUpperCase()} · MOVEMENT TEST</strong>
       <select aria-label="Test NPC" value={npcId} onChange={event => setNpcId(event.target.value)}>
-        <option value="kai">Kai</option><option value="mira">Mira</option>
+        <option value="kai">Kai</option><option value="mira">Mira</option><option value="cat">Cat</option>
       </select>
       {cycle.map(item => <button key={item} aria-pressed={activity === item}
-        onClick={() => setActivity(item)}>{getNpcSceneLocation(npcId, item)}</button>)}
+        onClick={() => setActivity(item)}>{getNpcSceneLocation(npcId, item)}{npcId === 'cat' ? ` / ${item}` : ''}</button>)}
       <button onClick={() => setActivity(cycle[(cycle.indexOf(activity) + 1) % cycle.length])}>Next →</button>
       <label><input type="checkbox" checked={showRoute} onChange={event => setShowRoute(event.target.checked)} /> Show route debug</label>
       {showRoute && <output className="route-status">Destination: {getNpcSceneLocation(npcId, activity)} · {movement?.phase}

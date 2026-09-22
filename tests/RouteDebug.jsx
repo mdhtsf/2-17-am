@@ -1,3 +1,4 @@
+import { shelfOcclusionOutline } from '../src/data/shelfOcclusion.js'
 import { sceneWaypoints, sceneWaypointEdges } from '../src/data/sceneWaypoints.js'
 import { scene } from '../src/data/scene.js'
 import { counterOcclusionOutline } from '../src/data/counterOcclusion.js'
@@ -6,8 +7,9 @@ export default function RouteDebug({ movement, npcId = 'kai' }) {
   if (!import.meta.env.DEV) return null
   const route = movement?.route || []
   const coordinates = id => `${sceneWaypoints[id].x * scene.width / 100},${sceneWaypoints[id].y * scene.height / 100}`
-  return <svg className="route-debug" viewBox={`0 0 ${scene.width} ${scene.height}`} aria-label={`${npcId === 'kai' ? 'Kai' : 'Mira'} waypoint graph`}>
+  return <svg className="route-debug" viewBox={`0 0 ${scene.width} ${scene.height}`} aria-label={`${npcId === 'kai' ? 'Kai' : npcId === 'mira' ? 'Mira' : 'Cat'} waypoint graph`}>
     <polygon className="counter-occlusion-debug" points={counterOcclusionOutline.map(point => point.join(',')).join(' ')} />
+    <polygon className="shelf-occlusion-debug" points={shelfOcclusionOutline.map(point => point.join(',')).join(' ')} />
     {sceneWaypointEdges.map(edge => <polyline key={edge.join('-')} points={edge.map(coordinates).join(' ')} className="route-edge" />)}
     {route.length > 0 && <polyline points={[movement.routeFrom, ...route].filter(id => sceneWaypoints[id]).map(coordinates).join(' ')} className="resolved-route" />}
     {sceneWaypoints[movement?.segmentFrom] && sceneWaypoints[movement?.segmentTo] && <polyline

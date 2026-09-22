@@ -19,13 +19,14 @@ export function getMovementDistance(previous, target) {
     (target.y - previous.y) * scene.height / 100)
 }
 
-export function getMovementDuration(previous, target) {
+export function getMovementDuration(previous, target, config = HUMAN_MOVEMENT) {
   const distance = getMovementDistance(previous, target)
   if (!distance) return 0
-  const rawMs = distance / HUMAN_MOVEMENT.pixelsPerSecond * 1000
+  const rawMs = distance / config.pixelsPerSecond * 1000
   // End on a complete four-frame cycle rather than cutting off a lifted foot.
-  const fullCycles = Math.round(rawMs / WALK_CYCLE_MS) * WALK_CYCLE_MS
-  return Math.min(HUMAN_MOVEMENT.maxDurationMs, Math.max(HUMAN_MOVEMENT.minDurationMs, fullCycles))
+  const cycleMs = 1000 / config.fps * config.frames
+  const fullCycles = Math.round(rawMs / cycleMs) * cycleMs
+  return Math.min(config.maxDurationMs, Math.max(config.minDurationMs, fullCycles))
 }
 
 export function getMovementDirection(previous, target) {
