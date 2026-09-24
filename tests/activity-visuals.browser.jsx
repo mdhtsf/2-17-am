@@ -31,7 +31,7 @@ export async function verifyActivityVisuals(root, container, check) {
       if (pose) {
         await act(async () => crop.querySelector('img').decode())
         check(crop.dataset.pose === activity && crop.querySelector('img').naturalWidth > 0, `${id}/${activity}: correct loaded transparent pose sheet`)
-      } else check(!crop, 'Kai counter keeps original idle artwork')
+      } else check(!crop, `${id}/${activity}: neutral activity keeps original idle artwork`)
       if (priorLocation === entity.dataset.location) {
         check(renderer.dataset.phase === 'idle' && entity.getAnimations().length === 0, `${id}/${activity}: same-location switch never walks`)
         if (priorActivity !== activity) check(Boolean(crop) && getComputedStyle(crop).opacity === '1', `${id}/${activity}: direct pose switch is visible`)

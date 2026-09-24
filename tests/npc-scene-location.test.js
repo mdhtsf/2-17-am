@@ -9,7 +9,7 @@ import { scene } from '../src/data/scene.js'
 
 const expectedCycles = {
   kai: ['counter', 'coffee_station', 'shelf', 'window'],
-  mira: ['notes_spot', 'notes_spot', 'fridge', 'window'],
+  mira: ['notes_spot', 'notes_spot', 'fridge', 'window', 'counter_chat'],
   cat: ['floor', 'floor', 'door', 'aisle'],
 }
 

@@ -14,7 +14,7 @@ export default function WalkingSprite({ visual, movement, getWalkingVisual, npcI
   const walk = displayed.kind === 'walk' ? displayed.walk : requestedWalk
   const displayedPose = displayed.kind === 'activity' ? displayed.pose : pose
   return <span className={`walking-visual ${npcId}-visual`} data-render-mode={displayed.kind} data-activity-pose={pose ? activity : undefined} data-direction={direction || 'idle'} data-phase={phase} data-waypoint={segmentTo} data-segment-from={segmentFrom} data-destination={destination}
-    style={{ '--walk-cycle': `${WALK_CYCLE_MS}ms`, '--walk-settle': `${HUMAN_MOVEMENT.settleMs}ms`,
+    style={{ '--walk-cycle': `${WALK_CYCLE_MS}ms`,
       '--walk-visible-height': registration?.visibleHeight, '--walk-bottom': registration?.bottom }}>
     {/* The idle canvas reserves the same entity/label/hitbox geometry in every phase. */}
     <img className="npc-sprite" src={visual.src} width={visual.width} height={visual.height}

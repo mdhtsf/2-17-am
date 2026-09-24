@@ -1,6 +1,9 @@
+import { requestSocialDialogue } from '../lib/socialChat.js'
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { ambientNpcIds, createInitialNpcActivities, requireNpcActivity } from '../data/npcActivities.js'
 import { nextNpcActivity } from '../game/npcActivityTransitions.js'
+import { createCounterCoherence } from '../game/counterCoherence.js'
+import { createFiniteActivities } from '../game/finiteActivities.js'
 import { createAmbientDirector } from '../game/ambientDirector.js'
 
 export function npcActivityReducer(activities, action) {
@@ -17,31 +20,54 @@ export function npcActivityReducer(activities, action) {
 export function useNpcActivities({ interactingId = null, catInteracting = false } = {}) {
   const [activities, dispatch] = useReducer(npcActivityReducer, undefined, createInitialNpcActivities)
   const latest = useRef(activities)
-  useEffect(() => { latest.current = activities }, [activities])
+  latest.current = activities
   const getNpcActivity = useCallback(npcId => requireNpcActivity(npcId, activities[npcId]), [activities])
   const setNpcActivity = useCallback((npcId, activity) => {
     requireNpcActivity(npcId, activity)
+    latest.current = npcActivityReducer(latest.current, { type: 'set', npcId, activity })
     dispatch({ type: 'set', npcId, activity })
   }, [])
   const advanceNpcActivity = useCallback(npcId => {
     // Validate before dispatch; the reducer advances from the latest snapshot.
     if (!ambientNpcIds.includes(npcId)) throw new RangeError('Unknown ambient NPC')
+    latest.current = npcActivityReducer(latest.current, { type: 'advance', npcId })
     dispatch({ type: 'advance', npcId })
   }, [])
-  const resetNpcActivities = useCallback(() => dispatch({ type: 'reset' }), [])
+  const resetNpcActivities = useCallback(() => { latest.current = createInitialNpcActivities(); dispatch({ type: 'reset' }) }, [])
   const [director] = useState(() => createAmbientDirector({
     getActivities: () => latest.current,
-    onActivity: (npcId, activity) => dispatch({ type: 'set', npcId, activity }),
+    onActivity: setNpcActivity,
+  }))
+  const [speech, setSpeech] = useState(null)
+  const [coherence] = useState(() => createCounterCoherence({
+    onDebug: import.meta.env.DEV ? detail => window.dispatchEvent(new CustomEvent('counter-social-debug', { detail })) : undefined,
+    generate: requestSocialDialogue, director, getActivities: () => latest.current, assign: setNpcActivity, onSpeech: setSpeech,
+  }))
+  const [completedActivities, setCompletedActivities] = useState({})
+  const [finite] = useState(() => createFiniteActivities({
+    onComplete: (id, activity) => {
+      setCompletedActivities(previous => ({ ...previous, [id]: activity }))
+      coherence.complete(id, activity)
+    },
+    onReset: id => setCompletedActivities(previous => previous[id] == null ? previous : { ...previous, [id]: null }),
   }))
   const [movementObservers] = useState(() => Object.fromEntries(ambientNpcIds.map(id =>
-    [id, movement => director.reportMovement(id, movement)])))
+    [id, (movement, activity) => {
+      director.reportMovement(id, movement)
+      if (activity) finite.report(id, activity, movement)
+      coherence.report(id, movement)
+    }])))
   useLayoutEffect(() => {
-    director.setInteractionLocks([interactingId || (catInteracting ? 'cat' : null)])
-  }, [director, interactingId, catInteracting])
+    const locks = [interactingId || (catInteracting ? 'cat' : null)]
+    director.setInteractionLocks(locks)
+    coherence.setInteractionLocks(locks)
+  }, [director, coherence, interactingId, catInteracting])
   useEffect(() => {
     director.start()
-    return () => director.stop()
-  }, [director])
+    finite.start()
+    coherence.start()
+    return () => { director.stop(); finite.stop(); coherence.stop() }
+  }, [director, finite, coherence])
 
-  return { activities, getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities, movementObservers }
+  return { activities, completedActivities, speech, getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities, movementObservers }
 }

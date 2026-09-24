@@ -12,7 +12,7 @@ for (const id of ['kai', 'mira']) {
     const cells = new Set()
     for (const activity of npcActivities[id]) {
       const pose = getActivityVisual(id, activity)
-      if (id === 'kai' && activity === 'behind_counter') { assert.equal(pose, null); continue }
+      if ((id === 'kai' && activity === 'behind_counter') || activity === 'talking_to_kai') { assert.equal(pose, null); continue }
       assert.ok(pose)
       assert.ok(!cells.has(pose.index))
       cells.add(pose.index)

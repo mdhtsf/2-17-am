@@ -127,13 +127,8 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .npc-sprite { display: block; width: 100%; height: auto; image-rendering: pixelated; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .walking-visual { display: block; position: relative; z-index: 1; pointer-events: none; }
 .npc-ground-shadow { position: absolute; z-index: 0; left: 50%; bottom: 1.5%; width: 70%; height: 3.5%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, #09121b35 0%, #09121b18 45%, transparent 72%); pointer-events: none; }
-.walking-visual .npc-sprite { opacity: 1; transition: none; }
-.walking-visual[data-phase="walking"] .npc-sprite { opacity: 0; }
-.walking-visual[data-phase="settling"] .npc-sprite { transition: opacity var(--walk-settle) linear; }
-.walking-visual[data-activity-pose] .npc-sprite { opacity: 0; }
 .activity-sprite { position: absolute; left: 50%; overflow: hidden; pointer-events: none; }
 .activity-sprite img { position: absolute; max-width: none; height: auto; image-rendering: pixelated; user-select: none; -webkit-user-drag: none; }
-.walking-visual[data-phase="walking"] .activity-sprite { opacity: 0; }
 /* C-3 asset registration: 928 visible pixels, feet at y=968 in the same 351×988 idle canvas. */
 .walking-sprite {
   position: absolute; height: var(--walk-visible-height, 93.9271%); bottom: var(--walk-bottom, 2.025%); left: 50%;
@@ -145,9 +140,9 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
   position: absolute; inset: 0; overflow: hidden;
   animation: kai-walk-frame var(--walk-cycle) steps(1, end) infinite;
 }
-.walking-visual[data-phase="settling"] .walking-sprite { opacity: 0; transition: opacity var(--walk-settle) linear; }
-.walking-visual[data-phase="settling"] .walking-frame { animation: none; opacity: 0; }
-.walking-visual[data-phase="settling"] .walking-frame:first-child { opacity: 1; }
+/* A retained decoded walk is a static fallback once travel has ended. */
+.walking-visual:not([data-phase="walking"]) .walking-frame { animation: none; opacity: 0; }
+.walking-visual:not([data-phase="walking"]) .walking-frame:first-child { opacity: 1; }
 .walking-frame img {
   position: absolute; width: 400%; max-width: none; height: auto;
   image-rendering: pixelated; user-select: none; -webkit-user-drag: none;
@@ -222,6 +217,7 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .dialogue h2 { margin: 0; color: #efd0a2; font-size: 19px; }
 .dialogue-identity > span { font-size: 8px; letter-spacing: 1.5px; color: #879aaa; }
 .spoken { color: #ddd5c6; font-size: 17px; line-height: 1.65; margin: 0 0 9px; }
+.spoken, .stage-direction { overflow-wrap: anywhere; }
 .stage-direction { color: #9ba7af; font-size: 11px; line-height: 1.6; margin: 0 0 12px; }
 .replies { display: flex; gap: 8px 22px; flex-wrap: wrap; }
 .replies button { padding: 4px 0; border: 0; background: none; color: #b4b8b7; text-align: left; font-size: 11px; cursor: pointer; }
@@ -303,6 +299,7 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .cat-walk img { display: block; width: 400%; max-width: none; height: 100%; image-rendering: pixelated;
   animation: cat-steps var(--cat-cycle) steps(4, end) infinite; }
 @keyframes cat-steps { to { transform: translateX(-100%); } }
+.cat-visual:not([data-phase="walking"]) .cat-walk img { animation: none; }
 @media (prefers-reduced-motion: reduce) { .cat-walk img { animation: none; } }
 
 /* Decode readiness, not the requested activity/phase, owns visibility. */
@@ -314,3 +311,28 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .walking-visual[data-render-mode="activity"] .activity-sprite,
 .walking-visual[data-render-mode="walk"] .walking-sprite,
 .walking-visual[data-render-mode="walk"] .cat-walk { opacity: 1; transition: none; }
+
+/* Dedicated portrait column: transparent bust artwork beside the existing text UI. */
+.dialogue { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 20px; }
+.dialogue-body { min-width: 0; }
+.portrait-column { align-self: start; position: sticky; top: 0; }
+.character-portrait { display: block; width: 100%; position: relative; overflow: hidden; }
+.character-portrait img { position: absolute; max-width: none; height: auto; image-rendering: pixelated; pointer-events: none; user-select: none; }
+.portrait-loading { display: grid; place-items: center; position: absolute; inset: 0; color: var(--muted); }
+.cat-feedback { display: flex; align-items: center; gap: 15px; }
+.cat-feedback .portrait-column { width: 52px; flex: 0 0 52px; position: static; }
+.cat-feedback strong { display: block; color: var(--gold); font-size: 12px; letter-spacing: 1px; }
+.cat-feedback p { margin: 5px 0 0; }
+@media (max-width: 760px), (max-height: 680px) {
+  .dialogue { grid-template-columns: 64px minmax(0, 1fr); gap: 12px; }
+}
+@media (max-width: 420px) {
+  .dialogue { grid-template-columns: 48px minmax(0, 1fr); gap: 10px; }
+}
+
+/* Overheard lines follow the same moving entity; never enter player dialogue. */
+.ambient-speech { position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); width: max-content; max-width: 225px; padding: 8px 11px; background: #142130f5; color: #ded0bb; box-shadow: 2px 0 #77818b, -2px 0 #77818b, 0 2px #77818b, 0 -2px #77818b; font: 12px/1.6 'Courier New', 'PingFang SC', monospace; white-space: normal; text-align: left; pointer-events: none; animation: overheard-in .18s ease-out; }
+.ambient-speech::after { content: ''; position: absolute; bottom: -5px; left: calc(50% - 3px); width: 6px; height: 4px; background: #77818b; }
+.npc[data-speaking] .npc-label, .npc[data-speaking] .npc-indicator { opacity: 0; }
+@keyframes overheard-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 760px) { .ambient-speech { max-width: 160px; font-size: 10px; } }

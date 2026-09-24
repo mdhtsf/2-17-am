@@ -20,7 +20,7 @@ for (const npcId of ambientNpcIds) {
     for (let index = 0; index < npcActivities[npcId].length; index++) {
       const previous = state
       const next = nextNpcActivity(npcId, state[npcId])
-      assert.equal(next, npcActivities[npcId][(index + 1) % 4])
+      assert.equal(next, npcActivities[npcId][(index + 1) % npcActivities[npcId].length])
       assert.equal(nextNpcActivity(npcId, state[npcId]), next)
       state = npcActivityReducer(state, { type: 'advance', npcId })
       assert.equal(state[npcId], next)

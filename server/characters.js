@@ -22,3 +22,9 @@ export function getCharacterPrompt(npcId) {
   const { name, role } = npcs[npcId]
   return `${world}\n\n当前角色：${name}。身份 / 状态：${role}。\n${personalities[npcId]}`
 }
+
+// Reuse identity without the player-only output contract for ambient exchanges.
+export function getCharacterPersonality(npcId) {
+  if (!Object.hasOwn(personalities, npcId)) throw new Error('Unknown character')
+  return personalities[npcId]
+}

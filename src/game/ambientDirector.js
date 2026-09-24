@@ -1,4 +1,4 @@
-import { ambientNpcIds, npcActivities } from '../data/npcActivities.js'
+import { ambientNpcIds, ambientActivityChoices } from '../data/npcActivities.js'
 import { getNpcSceneLocation } from './npcSceneLocation.js'
 import { getNpcWaypoint, sceneWaypoints } from '../data/sceneWaypoints.js'
 import { resolveNpcRoute } from './npcRoute.js'
@@ -22,7 +22,7 @@ export function ambientDelay(first, random = Math.random) {
 
 export function activityChoices(npcId, currentActivity) {
   const origin = getNpcWaypoint(npcId, getNpcSceneLocation(npcId, currentActivity))
-  return npcActivities[npcId].filter(activity => activity !== currentActivity).map(activity => {
+  return ambientActivityChoices[npcId].filter(activity => activity !== currentActivity).map(activity => {
     const destination = getNpcSceneLocation(npcId, activity)
     const route = resolveNpcRoute(origin, getNpcWaypoint(npcId, destination))
     const distance = route.reduce((total, point, index) => total +
@@ -60,14 +60,20 @@ export function createAmbientDirector({ getActivities, onActivity, random = Math
   let pending = null
   let recent = []
   let locked = []
+  let reservation = null
+  let ticket = null
   const movements = new Map()
   const settled = () => ambientNpcIds.every(id => movements.get(id)?.phase === 'idle')
-  const cancel = () => { if (timer !== null) clearTimer(timer); timer = null }
+  const cancel = () => { if (timer !== null) clearTimer(timer); timer = null; ticket = null }
   const schedule = () => {
-    if (!running || timer !== null || pending || !settled() || locked.length === ambientNpcIds.length) return
+    if (!running || timer !== null || pending || reservation || !settled() || locked.length === ambientNpcIds.length) return
+    const ownTicket = {}
+    ticket = ownTicket
     timer = setTimer(() => {
+      if (ticket !== ownTicket) return
+      ticket = null
       timer = null
-      if (!running || pending || !settled()) return
+      if (!running || pending || reservation || !settled()) return
       const event = chooseAmbientEvent(getActivities(), recent, random, locked)
       if (!event) return
       // Reserve before React dispatch so another event cannot race the first
@@ -81,6 +87,17 @@ export function createAmbientDirector({ getActivities, onActivity, random = Math
   return {
     start() { running = true; schedule() },
     stop() { running = false; cancel() },
+    reserve(owner) {
+      if (!running || pending || reservation || !settled()) return false
+      reservation = owner
+      cancel()
+      return true
+    },
+    release(owner) {
+      if (reservation !== owner) return
+      reservation = null
+      schedule()
+    },
     setInteractionLocks(ids) {
       locked = ambientNpcIds.filter(id => ids.includes(id))
       if (locked.length === ambientNpcIds.length) cancel()

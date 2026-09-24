@@ -10,6 +10,8 @@ export const npcSceneAnchors = Object.freeze({
     window: Object.freeze({ x: 88, y: 79, ...getKaiSceneDepth({ y: 79 }) }),
   }),
   mira: Object.freeze({
+    // Reuse the existing public counter opening, without adding graph edges.
+    counter_chat: Object.freeze({ x: 51.5, y: 45.5, ...getHumanSceneDepth({ y: 45.5 }) }),
     notes_spot: Object.freeze({ x: 58.6, y: 55, ...getHumanSceneDepth({ y: 55 }) }),
     fridge: Object.freeze({ x: 64.8, y: 57, ...getHumanSceneDepth({ y: 57 }) }),
     drink_area: Object.freeze({ x: 68, y: 59, ...getHumanSceneDepth({ y: 59 }) }),

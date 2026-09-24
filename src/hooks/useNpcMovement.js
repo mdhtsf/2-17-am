@@ -100,6 +100,14 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
       entity.style.zIndex = logicalLocation ? getSegmentLayer(from, next) : next.zIndex
       void entity.offsetWidth
 
+      // Subpixel endpoint corrections must not flash a complete walk/settle cycle.
+      if (!duration) {
+        entity.style.zIndex = next.zIndex
+        progress.current = { node: logicalLocation ? next.id : null, edge: null }
+        index++
+        startSegment()
+        return
+      }
       current = { direction, phase: 'walking', segment: ++segment.current,
         route: route.map(point => point.id), routeFrom, segmentFrom: fromId, segmentTo: next.id,
         destination: logicalLocation }
@@ -114,7 +122,6 @@ export function useNpcMovement(anchor, entityRef, enabled, logicalLocation, npcI
         index++
         startSegment() // No idle / settle between waypoints.
       }
-      if (!duration) { finishSegment(); return }
       timer = window.setTimeout(finishSegment, duration + config.completionGraceMs)
     }
     const onArrival = event => {

@@ -53,6 +53,7 @@ export function getNpcWaypoint(npcId, location) {
   if (!['kai', 'mira', 'cat'].includes(npcId) || !Object.hasOwn(npcSceneAnchors[npcId], location)) {
     throw new RangeError('Unknown NPC destination')
   }
+  if (npcId === 'mira' && location === 'counter_chat') return 'counter_exit'
   return npcId === 'kai' ? location : `${npcId}_${location}`
 }
 

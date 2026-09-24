@@ -38,7 +38,7 @@ function isNetworkFailure(error) {
   return error instanceof TypeError && /^(fetch failed|failed to fetch|networkerror when attempting to fetch resource\.?|load failed)$/i.test(error.message)
 }
 
-async function requestModel(model, generation, apiKey, signal) {
+export async function requestModel(model, generation, apiKey, signal) {
   // Serialize outside the transport catch: programming errors cannot trigger fallback.
   const body = JSON.stringify({ model, ...generation })
   let response

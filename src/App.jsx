@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ConvenienceStoreScene from './components/ConvenienceStoreScene'
 import DialoguePanel from './components/DialoguePanel'
+import CharacterPortrait from './components/CharacterPortrait.jsx'
 import { characters, catFeedback } from './data/characters'
 import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 import { useNpcActivities } from './hooks/useNpcActivities.js'
@@ -49,18 +50,18 @@ export default function App() {
     </header>
     <div className="world-viewport">
       <div className="location-caption" aria-hidden="true"><span className="moon">☾</span><div>AFTER HOURS<small>A small corner<br/>for the restless.</small></div></div>
-      <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} activities={ambientRuntime.activities}
+      <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} activities={ambientRuntime.activities} completedActivities={ambientRuntime.completedActivities} speech={ambientRuntime.speech}
         onKaiMovementChange={ambientRuntime.movementObservers.kai}
         onMiraMovementChange={ambientRuntime.movementObservers.mira}
         onCatMovementChange={ambientRuntime.movementObservers.cat} />
       <div className="interaction-area">
         {selectedId
-          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} activity={ambientRuntime.activities[selectedId]} onComplete={completeTurn} onClose={closeDialogue} />
+          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} activity={ambientRuntime.completedActivities[selectedId] === ambientRuntime.activities[selectedId] ? undefined : ambientRuntime.activities[selectedId]} onComplete={completeTurn} onClose={closeDialogue} />
           : <div className="scene-invitation"><span>· · ·</span><p>No rush. The rain isn’t going anywhere.</p><small>点击角色，聊上几句</small></div>}
       </div>
     </div>
     <div className={`cat-feedback ${catActive ? 'visible' : ''}`} role="status">
-      {catActive && catFeedback}
+      {catActive && <><CharacterPortrait npcId="cat" /><div><strong>THE CAT</strong><p>{catFeedback}</p></div></>}
     </div>
     <footer className="game-footer"><span>RAINY NIGHTS.<br/>BRIGHTER PEOPLE.</span><span>PROLOGUE 01 <i /> THE NIGHT SHIFT</span></footer>
   </main>

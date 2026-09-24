@@ -17,6 +17,7 @@ const descriptions = {
     checking_phone: 'Mira is currently checking her phone.',
     choosing_drink: 'Mira is currently choosing a drink by the refrigerator.',
     staring_out_window: 'Mira is currently gazing out at the rainy street.',
+    talking_to_kai: 'Mira has approached the counter for a brief, quiet exchange with Kai.',
   },
 }
 

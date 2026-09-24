@@ -574,12 +574,153 @@ Director 在执行事件时排除当前对话角色，不重置已有随机等�
 
 **消失问题：** 修复前在本地生产构建、Cache-Control: no-store、活动/行走 PNG 延迟响应环境中复现：idle 图片已加载却 opacity=0，活动 PNG 尚无自然尺寸，导致角色空白。现在场景初始化预加载所有登记素材；`spriteAssets.js` 去重并等待 image.decode，保留解码后的 Image；`useLoadedSprite` 在目标素材就绪前保留最后可绘制描述（含姿态裁剪或行走方向），解码失败仍保留旧图。显示模式与逻辑 movement phase 分离，不暂停或改写路线，也不同时显示两套精灵。初次页面加载仍需等待初始 idle 图片；慢网下可能暂以旧姿态随锚点移动。
 
-冷加载重放：先 `npm run build`，再 `node tests/cold-assets-server.mjs`，打开 `http://127.0.0.1:5187/`。这是只服务 dist 的本地测试工具，不调用 API、不读取环境密钥；所有新姿态/行走素材延迟 12 秒且不缓存，首轮固定选择 Kai。修复后 14 秒期间每 500ms 采样一次，28 组样本中，初始图可用后的空白数和重复可见精灵数均为 0，覆盖 walking 时保留 idle 和到达后显示活动图。
+冷加载重放：先 `npm run build`，再 `node tests/cold-assets-server.mjs`，打开 `http://127.0.0.1:5187/`。这是服务 dist 的本地测试工具，不调用真实模型、不读取环境密钥（Stage 5 增加了本地模拟 API）；所有新姿态/行走素材延迟 12 秒且不缓存，首轮固定选择 Kai。修复后 14 秒期间每 500ms 采样一次，28 组样本中，初始图可用后的空白数和重复可见精灵数均为 0，覆盖 walking 时保留 idle 和到达后显示活动图。
 
 本轮保留 movement/activity/occlusion 及 API fallback 回归，另测活动校验、服务端夜间基调与不递进、交互排除/释放、解码等待、过期加载和失败保留。189 项 Node 测试、851 项浏览器/runtime 检查通过，生产构建和 git diff --check 通过；Console 无 error/warning。测试调用模拟 OpenRouter，没有发起真实模型请求或部署。
 
 仍有限制：模型遵循语气的效果仍需人工实聊验收；图像加载失败会继续显示旧姿态，刷新后重试；正在发生的移动不因打开对话而取消。步态真实感、美术和尺度微调留到 Final Polish，不在本轮处理。没有开始 Stage 5，没有 commit、tag 或 push。
 
+### Stage 5 — Final Polish & Demo Readiness
+
+本轮完成保守收尾，不重做美术、导航、调度或对话系统。
+
+- 移动：2 art px 以内的端点余量直接对齐，不再为几乎看不见的位移播放 500ms 行走和 settling。真实路线、透视和脚底锚点不变；Kai/Mira 仍为 155 art px/s、Cat 为 125 art px/s，四帧 8 FPS 和周期取整不变。
+- 冷素材切换：若到达后活动图尚未解码，保留的已加载行走图停在单帧，不会在 idle 阶段重新原地踏步。仍由解码状态控制唯一可见精灵，不添加交叉淡化或重复图层。
+- 对话：长英文词/无空格回复自动换行，避免水平撑出面板。既有滚动、输入、关闭、失败重试、按角色隔离的 history 和交互锁保留。
+- 清理：删除已经被解码可见性规则覆盖的旧 opacity/settling CSS 与未使用的 `--walk-settle` 属性。未删除历史参考素材，也未重新引入关系递进。
+- 氛围与画面：检查现有 idle、步行、活动姿态和同地点切换，保留所有 PNG、比例、坐标、柜台/货架遮罩及 Director 的 8–14s / 16–28s 节奏。
+
+验证命令与页面：
+
+```sh
+node --test tests/*.test.js
+npm run build
+git diff --check
+# 开发回归：启动 Vite，打开 /tests/runtime.browser.html
+npm run dev
+# 另一个终端：本地生产构建 + 故障注入，绝不连接真实 OpenRouter
+node tests/cold-assets-server.mjs
+```
+
+冷素材与完整流程测试页：`http://127.0.0.1:5187/__demo__/production.browser.html`。该独立页面在 iframe 中加载真正的 dist 构建，并通过本地 HTTP 请求调用原 API 校验器及模拟 provider。固定首轮 Kai，素材响应延迟 12s、Cache-Control: no-store；自动检查初始渲染、首次移动/活动、Loading、防重复、两轮 history、角色切换、一次失败后的重试、过期回复、猫反馈、刷新及 1280×720 / 1440×900 / 1024×768 视口。每次新一轮测试前重启该服务，以重置一次性失败记录。测试页与服务均不进入 dist，也不读取 .env.local。
+
+结果：190 项 Node 测试、862 项浏览器/runtime 检查、27 项生产流程检查通过；生产测试每 100ms 采样，共 160 组，初始图可用后没有空白或重复精灵。已有 Kai/Mira/Cat、最新目标中断、活动视觉、Director、交互锁、活动对话、柜台/货架和 OpenRouter fallback 回归继续通过。生产构建与 git diff --check 通过；正常场景、移动页和 runtime 页 Console 无 error/warning，生产流程没有应用脚本错误或未处理 Promise。故障注入的 HTTP 500 是预期测试信号；iframe 验证期间浏览器工具注入层曾报 MutationObserver 错误，应用源码没有该调用。
+
+演示限制：保留四帧步态，接地/转向不是物理模拟；极慢网络下可能暂以旧姿态移动，图片失败则保留旧图直到刷新。当前测试验证本地生产包和模拟上游，未验证线上 Vercel 或真实模型当天的可用性/回复质量。Stage 5 到此停止，未 commit、tag 或 push。
+
 ## 当前美术边界
 
 背景仍是静态图，角色已分离为独立透明精灵，可按活动在锚点之间平滑移动；Kai 和 Mira 在移动中播放行走帧。动态来自 CSS 雨层、位置过渡和人形步态。极窄屏和非 3:2 窗口沿用基础取景；后续需继续校准落点、层级和遮挡。Kai 和 Mira 近似匀速，受四帧素材和周期取整影响，步幅与实际地面位移仍可能略有差异；两人沿手工通道绕行主要家具，但没有动态避障或方向对应的站立姿势。
+
+### Pre–Stage 5 Living World — Finite Kai Tasks & Dialogue Portraits
+
+本轮仅增加短任务完成时钟与左侧肖像，不启动 Living World。
+
+`shared/npcActivities.js` 的 `finiteActivityDurations` 仅登记 Kai 的 `making_coffee` 和 `checking_shelf`，均为随机 **5000–10000ms**。`src/game/finiteActivities.js` 使用既有 movement observer，在对应目的地收到 idle（包括原有 settling 结束）后开始计时。计时独立于 Director；重复 idle 不重启计时，活动变化、重新移动和卸载会取消旧 timer，token 检查阻止过期回调和重复完成。Strict Mode 的 stop/start 也不会残留两个时钟。
+
+完成状态独立于活动指派：保留原 activity→location 和原坐标，只让 Kai 显示原有 neutral/idle 图，不发起新活动、不走回柜台，也不改变环境事件的间隔或锁定。对话进行中仍可自然结束手头短任务，NPC 的交互锁保持；已完成的任务不再作为正在执行的 activity 发送给 API，省略该可选字段沿用现有兼容路径。看窗、Mira 的活动、Cat 睡觉等持续状态没有完成时钟。手动 movement harness 仍保持姿态，便于美术检查；实际 App 使用完成时钟。
+
+肖像复用透明主图，不生成或改写 PNG，不放大网页中已经缩小的精灵：
+
+| NPC | 来源 | 原图裁切区域（x, y, width, height） |
+| --- | --- | --- |
+| Kai | `/assets/npcs/kai.png` | 0, 32, 351, 600 |
+| Mira | `/assets/npcs/mira/mira-idle.png` | 0, 22, 411, 585 |
+| Cat | `/assets/npcs/cat/cat-watching.png` | 72, 0, 152, 155 |
+
+`npcPortraits.js` 集中登记半身裁切，`CharacterPortrait.jsx` 保留 alpha 和像素渲染。场景初始化通过已有解码缓存预加载；普通切换直接显示正确角色，避免使用上一个角色的脸。首次网络尚未就绪时固定区域显示克制的省略号，不显示破图。桌面对话左列 96px，紧凑窗口 64px，窄屏 48px；右侧继续使用现有角色名、对话、选项和输入。Cat 保持原本的五秒本地反馈，只给反馈面板增加 52px 肖像和 THE CAT 标题，不引入模型输入或新的聊天行为。
+
+新增测试覆盖任务时长范围、到达后起算、重复 idle、旧回调、A→B→A、停止清理、持久活动不超时、对话锁内完成、原地 neutral、完成后的 API 语义、透明图边界和即时肖像切换。未更改 OpenRouter provider、路线、角色比例或遮挡。
+
+本轮验证：201 项 Node、885 项浏览器/runtime、34 项本地生产流程检查通过，build 与 git diff --check 通过。生产流程含 12 秒冷素材延迟、160 组可见性采样、三种桌面尺寸和 390×844 窄屏；普通页面 Console 无 error/warning。未调用真实 OpenRouter，未修改 provider。限制：完成后使用原有通用站姿，不新增地点专用 neutral 美术；首次极慢加载时肖像区域可能短暂显示省略号。当前工作树还包含此前未提交的 final-polish 改动；本轮不 commit/tag/push，不启动 Stage 5 Living World。
+
+### Pre–Stage 5 — Counter Responsibility & Overheard Conversation
+
+此节更新上面的短任务结束行为：现在结束后自动回柜台；玩家正与 Kai 对话时先在原地 neutral 等待，解锁后才开始返回。未启动 Stage 5 Living World。
+
+- `ambientActivityChoices` 将 Kai 的日常选择限定为 behind_counter、making_coffee、checking_shelf。沿用 counter、coffee_station 和柜台右侧 shelf 三个既有位置；looking_out_window 仍是合法手动测试活动，但不再被 Ambient Director 自动选中。Mira/Cat 原有普通候选不变。
+- 到达后的 5–10 秒短任务时钟保持。`counterCoherence.js` 收到完成通知后通过 Director 的轻量 reserve/release 接口取得移动互斥，再直接指派 behind_counter。返回不计入普通活动事件或冷却历史；其他移动进行中则等待，玩家交互中延后，新任务覆盖旧待返回请求。到达柜台后释放互斥，恢复正常随机间隔。
+- 稀有交谈机会随机相隔 **90–180 秒**。Kai 必须在柜台、双方不在玩家对话中、所有角色已停止移动且没有待执行普通事件，才可开始；条件不合适就跳过，等待下一整个随机间隔，不排队追赶。
+- Mira 使用仅社交事件选择的 `talking_to_kai`，位置 `counter_chat` 别名到现有 **counter_exit (51.5%,45.5%)**。没有新增 waypoint 或边，也没有更改已验收通道/遮罩。Mira 到达后才开始说话；Kai 始终在柜台。结束后 Mira 沿既有路线恢复先前活动，再释放普通调度。玩家介入立即结束旁听；如果正在与 Mira 对话，延后她的离开。
+- `counterConversations.js` 包含三组本地短对话，每组 3–4 句，Mira/Kai 交替；排除上一组，避免连续复读。每句随机 **2.2–2.8 秒**，不进入玩家 history、不存储关系状态。此池现已作为下方动态交谈的失败/超时备用。
+- `AmbientSpeechBubble.jsx` 作为角色同一移动实体的绝对定位子元素，始终在说话者上方，只有一个气泡，淡入、自动推进和清理。不中断玩家的底部 DialoguePanel，不拦截点击；原人物标签仅在其说话时暂时隐藏。
+
+手动预览：启动 `npm run dev`，打开 `/tests/counter-preview.html`，点击 **Dev · Try counter conversation** 提前触发一次机会。该开发按钮只缩短本次等待，仍执行全部安全条件；若 Kai 正在任务中或玩家正在交谈则会跳过。这个页面不进入生产构建。也可在正常游戏保持不操作，等待真实的 90–180 秒机会。移动页仍能单独检查 Mira 的 counter_chat 及 Kai 的历史窗边路线。
+
+新增回归覆盖柜台活动白名单、自动返回、锁定延后、新任务覆盖、其他移动互斥、稀有机会/跳过、Mira 到达门槛、台词轮换和回调清理、气泡锚定，以及正常调度恢复（动态升级后另验证单次社交 API 请求）。原有移动、姿态、肖像、活动对话、counter/shelf 遮挡和 OpenRouter fallback 检查继续保留。限制：使用现有柜台右侧停靠点和通用站姿，没有专门转身/对视美术；事件条件不满足时可能长时间没有交谈，这符合本轮稀有旁听定位。
+
+本轮结果：221 项 Node 测试、934 项浏览器/runtime 检查、34 项本地生产流程检查通过，production build 和 git diff --check 通过。浏览器回归与实际旁听预览 Console 无 error/warning；另在正常场景检查了柜台气泡和角色停靠位置。生产流程仍使用本地模拟回复，没有调用真实模型或部署。保留此前未提交改动，本轮未 commit/tag/push，停止于 Pre–Stage 5。
+
+
+### Pre–Stage 5 · 动态柜台交谈
+
+有效事件开始、Mira 接近柜台时，`counterCoherence` 并行调用 `POST /api/social-chat`。仅发送 Kai 当前活动、Mira 当前/前一活动 ID；`server/social-handler.js` 校验并投影这些字段，忽略客户端额外指令。`server/social-dialogue.js` 复用服务器角色人格、场景氛围和 OpenRouter transport，一次生成完整交换，绝不逐句调用。
+
+模型仍从服务器 `OPENROUTER_MODEL` 读取，默认 `openrouter/free`；reasoning 关闭、max_tokens 384、服务器超时 10 秒。为满足每事件一次生成，社交失败直接走精选台词，不额外尝试第二模型；玩家 `/api/chat` 的模型 fallback 完全保留。
+
+共享结构校验器只接受 2–4 行、仅 Kai/Mira 且双方都有台词、每行最多 64 字的非空纯文本，去掉多余字段并拒绝明显分析标记。服务器失败只返回 `{fallback:true}`，不返回模型原文或异常详情。前端再次校验结果，映射到既有气泡格式。
+
+Mira 到达时若生成已就绪则播放；仍在进行则自然停留最多 3 秒，宽限超时才播放精选交换并取消请求。玩家介入、事件退出或卸载均取消请求；事件身份与阶段校验保证迟到回复不会替换已经播放的台词。Mira 继续按既有规则恢复先前活动，正在与玩家交互时延后，不覆盖更新的状态。没有长期记忆或关系进度。
+
+真实模型的文风与生成速度仍需人工验收；结构校验不能保证每句都符合语气。在较短接近路线或慢模型下，备用台词出现较多是有意的无等待行为。Node/browser 验证使用模拟生成，不消耗真实 API。
+
+动态升级验证：229 项 Node 测试、939 项浏览器/runtime 检查、34 项生产流程检查通过；生产冷加载采样 160 次。build、git diff --check 通过。运行时测试 Console 无 error/warning；生产 iframe 工具注入曾报 MutationObserver warning/error，应用自身捕获的脚本错误和未处理 rejection 为零。此后升级为最多三段已播放生成内容的会话内防重复上下文，完全相同的回复仍视为不可用，不重试模型。不 commit/tag/push，未进入 Stage 5。
+
+
+### Pre–Stage 5 · 社交生成可观测性与多样性
+
+旧实现已通过确定性回归确认：到达柜台立即 abort 未完成请求，迟到的有效回复也被丢弃。现在仍提前生成，到达后给予 `COUNTER_SOCIAL.graceMs = 3000` 的无 UI 等待窗口，窗口内返回立即开始播放；已确认失败则到达后直接用备用，服务器请求上限仍为 10 秒。窗口结束标记 `grace_timeout`，与服务器 `timeout`、`invalid_output`、`generation_error`、前端 `network_error` 分开。不会无限等待，也不会迟到替换正在播放的句子。
+
+社交专用采样为 temperature **0.95**、top_p **0.93**、max_tokens **384**，reasoning 关闭。支持 Kai 或 Mira 开头、2/3/4 行以及不固定交替的节奏。Prompt 扩大日常话题范围，不强制轮换；玩家 `/api/chat` 参数与 fallback 不变。
+
+仅在当前页面内保存最近 3 段已开始播放的有效生成交换；下次附带 `recentExchanges`。服务器限制数量并重新校验每段，将它们作为不可信 user-context 数据，绝不拼进 system 指令。Prompt 明确避免相同话题、开头、包袱、结构和近似改写。语义防重复依赖模型，客户端另拒绝完全相同的近期交换。无数据库、关系或长期记忆。
+
+`/api/social-chat` 返回不可见的 `source: llm | fallback`，失败带有限枚举 reason。真正播放来源由控制器记录，包含客户端超时和重复内容降级。DEV-only `tests/counter-preview.html` 显示 SOURCE、原因、耗时及最近 10 次完整交换。角色返回后可再次点击触发，不必等 90–180 秒；忙碌条件仍保留。生产构建没有调试面板和调试事件，正常社交间隔未改。
+
+本轮真实服务端采样 3 次：1 次 LLM（1326ms），1 次 invalid_output（5183ms），1 次 generation_error（606ms）。这是服务器调用样本，不是浏览器完整链路成功率，也不能代表历史 fallback 比例。当前 Vercel 本地服务需要恢复登录，尚未在真实后端完成连续 5–10 次浏览器语气验收。Node 原生加载环境供服务器使用，未输出密钥；没有修改模型或部署。
+
+本轮最终验证：232 项 Node、958 项浏览器/runtime、34 项生产流程检查通过，冷素材采样 160 次正常；build 与 git diff --check 通过。第一次浏览器全量运行在既有 Kai 路由计时检查上失败，未改移动代码，完整复跑通过，仍需留意此测试的计时敏感性。运行时 Console 无 error/warning。DEV 页实测能显示前端无 API 时的 `SOURCE: FALLBACK / http_error`；真实连续浏览器验收须先恢复 Vercel 本地服务。工作树保留，未 commit/tag/push，未启动 Stage 5。
+
+### Pre–Stage 5 · Social pipeline reliability diagnostics (current behavior)
+
+This section supersedes the arrival/grace timeout described above. Social generation starts during approach and has **one total budget from request start**, not a deadline relative to Mira's arrival. Server timeout is 45 seconds; the frontend watchdog is 50 seconds (including HTTP overhead). Arrival only enters an idle waiting phase. Responses received while approaching or waiting remain valid. Player interruption/unmount cancels the request and clears the watchdog; late replies cannot resurrect the event. No automatic retry or second model request was added.
+
+Diagnosis with the existing local model `nvidia/nemotron-3-super-120b-a12b:free` confirmed valid key/environment loading, the correct OpenRouter endpoint, Bearer authorization and JSON content type. **HTTP 200 does not always mean generation success**: a captured body contained provider error code 503 and `Upstream error from Nvidia: Service temporarily overloaded`. The old player-oriented transport discarded this detail before the social handler mapped it to `generation_error`. A separate failure was trailing non-whitespace after a generated JSON object. The previous 3-second arrival grace also cancelled requests independently of the server's generation budget.
+
+Social transport now lives in `server/social-transport.js`, keeping `server/openrouter.js` and player conversation behavior unchanged. The same endpoint/model/env/header contract is used. `response_format: {type:'json_object'}` requests JSON mode, as documented in [OpenRouter's parameter reference](https://openrouter.ai/docs/api_reference/parameters#response-format); the server still independently validates every response. Only a complete optional JSON code fence is unwrapped. Trailing prose, truncated JSON and invalid schemas are rejected rather than repaired or partially rendered. Sampling remains 0.95/0.93, max_tokens remains 384 and reasoning remains disabled. No creativity changes were made in this correction.
+
+Fallback reasons distinguish `missing_api_key`, `network_error`, `openrouter_http_error`, `openrouter_provider_error`, `response_json_error`, `invalid_response`, `truncated_response`, `json_parse_error`, `schema_validation_error`, `timeout`, `request_cancelled` and unexpected `internal_error`. Production returns only source/reason/validated dialogue. Local development (`NODE_ENV=development`, or explicit `SOCIAL_CHAT_DEBUG=1` outside production) additionally returns a bounded diagnostic trace: request start/model, response HTTP status, provider code/message, content length/finish reason, schema completion or exact failure stage. Secrets/Bearer values are redacted; raw response bodies, reasoning and full provider metadata are never exposed. Debug flags cannot enable traces in a production environment.
+
+The DEV counter preview now has both **Try counter conversation** and **Test social API only**. The latter isolates API generation without waiting for movement and has its own 50-second watchdog. Each attempt displays source, reason, detail, latency, trace and dialogue; pending attempts appear immediately. It retains the last 10 entries. Use `/tests/counter-preview.html` on the Vercel dev origin (normally port 3000); the Vite-only port intentionally reports `api_http_error` because it does not host Vercel functions.
+
+Real server sample comparison (six requests each, small non-concurrent sample):
+
+| Request version | Valid dialogue | Failure details |
+| --- | --- | --- |
+| Before | 4/6 (66.7%) | 1 JSON trailing-character parse failure; 1 HTTP-200/provider-503 overload |
+| After | 3/6 (50%) | 3 HTTP-200/provider-503 overloads; no JSON/schema failures |
+
+The samples **do not demonstrate an overall availability improvement**. They demonstrate precise overload diagnosis and successful JSON-mode requests. Free-provider availability still limits success; increasing timeouts cannot repair an immediate 503. Historical generic logs cannot retrospectively identify every earlier failure. No model switch/retry, UI redesign, movement/routing/scheduling change or Stage 5 work was introduced.
+
+This correction changed only these social-pipeline files (the checkout also contains earlier uncommitted work):
+- `server/social-transport.js` (new), `server/social-dialogue.js`, `server/social-handler.js`
+- `shared/socialTiming.js` (new), `shared/socialDialogue.js`
+- `src/lib/socialChat.js`, `src/game/counterCoherence.js`, `src/data/counterConversations.js`
+- `tests/counter-preview.jsx`, `tests/counter-coherence.test.js`, `tests/counter-social.browser.jsx`, `tests/social-dialogue.test.js`, `tests/social-transport.test.js` (new)
+- `README.md`
+
+No edits to player `server/openrouter.js`, NPC movement, ambient event cadence, scene assets or dialogue panel were made in this correction. Existing unrelated working-tree changes remain intact.
+
+Final verification for this correction: **237 Node tests**, **958 browser/runtime checks**, **34 production-flow checks**, and **160 cold-load visibility samples** passed. Production build and `git diff --check` passed. Runtime test Console had no error/warning. Browser/provider regression fixtures use mocked replies; the twelve real server requests above are reported separately. `.env.local` remains ignored. No commit/tag/push or Stage 5 work.
+
+### Social dialogue quality pass
+
+Social generation now uses a focused, server-owned Kai/Mira context instead of reusing player-addressed personality text. Their static relationship is familiar acquaintances, not close friends; this is fictional background, not a progression system. Kai is quiet and gentle, notices concrete details and offers indirect practical care without generic encouragement. Mira is quiet, independent and a little distant, with occasional specific low-key complaints about writing/research. The prompt favors short break-time exchanges, ordinary phrasing and varied conversational rhythms over poetic metaphors, forced punchlines or intimacy.
+
+The existing session-local last-three-generated-exchange buffer is unchanged. `recentSocialTopics` derives bounded topic occurrence counts on the server (coffee/drinks, rain/weather, paper/research/revision, staying up late) and adds them only to the untrusted user-context section. The prompt discourages revisiting these recent subjects, openings and emotional endings; it does not mechanically cycle through topics. Full recent lines continue to help avoid repeats outside these four broad heuristics. No database, permanent memory, relationship level or extra model request was added.
+
+Transport, timeouts, JSON mode/schema, curated fallback, model, temperature 0.95/top_p 0.93 and player conversation prompts remain unchanged. This pass modifies only `server/social-dialogue.js`, `tests/social-dialogue.test.js` and this README.
+
+Final-prompt real server validation: 2/3 requests returned `source: llm`, 1/3 returned `source: fallback` with `openrouter_provider_error`. Outputs are not guaranteed to be polished: occasional awkward wording/typos and semantic repetition remain possible with the current model. Initial qualitative samples prompted stronger constraints against invented special facilities and abstract poetic imagery; no output is silently rewritten. The recent-topic matcher is deliberately heuristic, not semantic memory.
+
+Quality-pass verification: 238 Node tests and 958 browser/runtime checks passed; browser Console had no error/warning. Production build and `git diff --check` passed. No commit/tag/push.

@@ -41,14 +41,14 @@ test('NPC selection avoids consecutive repeats and balances a long session', () 
   assert.equal(chooseAmbientEvent(activities, ['mira'], () => 0.3).npcId, 'kai')
 })
 
-test('activity weights prefer short/medium actual routes but keep distant destinations reachable', () => {
+test('Kai autonomous choices stay counter-side while Mira and Cat retain their activities', () => {
   const choices = activityChoices('kai', 'behind_counter')
   const coffee = choices.find(choice => choice.activity === 'making_coffee')
   const shelf = choices.find(choice => choice.activity === 'checking_shelf')
   const window = choices.find(choice => choice.activity === 'looking_out_window')
-  assert.ok(coffee.distance < shelf.distance && shelf.distance < window.distance)
-  assert.ok(coffee.weight > window.weight && shelf.weight > window.weight)
-  assert.ok(window.weight > 0)
+  assert.ok(coffee.distance < shelf.distance)
+  assert.equal(window, undefined)
+  assert.equal(activityChoices('mira', 'reading_notes').some(c => c.activity === 'talking_to_kai'), false)
   const random = seededRandom()
   let short = 0
   for (let i = 0; i < 2000; i++) {

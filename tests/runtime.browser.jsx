@@ -1,3 +1,7 @@
+import { verifyCounterSocial } from './counter-social.browser.jsx'
+import { verifyPortraits } from './portraits.browser.jsx'
+import { verifyFiniteActivities } from './finite-activities.browser.jsx'
+import { verifyDemoPolish } from './demo-polish.browser.jsx'
 import { verifySpriteReadiness } from './sprite-readiness.browser.jsx'
 import { verifyInteractionCoherence } from './interaction-coherence.browser.jsx'
 import { npcSpriteAssets } from '../src/data/npcSpriteAssets.js'
@@ -65,7 +69,11 @@ const spoken = () => container.querySelector('.spoken').textContent
 
 try {
   await Promise.all(npcSpriteAssets.map(loadSprite))
+  await verifyDemoPolish(root, container, check)
   await verifySpriteReadiness(root, container, check)
+  await verifyCounterSocial(root, container, check, intervalClock)
+  await verifyPortraits(root, container, check)
+  await verifyFiniteActivities(root, container, check, intervalClock)
   await verifyInteractionCoherence(root, container, check, intervalClock)
   await verifyActivityVisuals(root, container, check)
   await verifyShelfOcclusion(root, container, check)
@@ -156,8 +164,8 @@ try {
   await click('.npc-mira')
   await say('再聊一会儿')
   await say('接着刚才的话')
-  check(requests.every(request => Object.keys(request).sort().join(',') === 'activity,history,message,npc'), 'requests contain semantic activity only, never rendering data')
-  check(requests.every(request => npcActivities[request.npc].includes(request.activity)), 'each request contains only its own NPC valid activity')
+  check(requests.every(request => ['activity,history,message,npc', 'history,message,npc'].includes(Object.keys(request).sort().join(','))), 'requests contain semantic activity only, never rendering data')
+  check(requests.every(request => (request.activity === undefined || npcActivities[request.npc].includes(request.activity))), 'each request contains only its own NPC valid activity')
   check(requests.every(request => request.history.every(entry => (entry.role === 'user' || entry.role === 'assistant') && Object.keys(entry).sort().join(',') === 'content,role')), 'history never contains system messages or state context')
   check(!/trust|familiarity|deadlineStress|hasMetPlayer|exhausted|neutral/.test(container.textContent), 'game has no runtime debug UI')
   check(!/behind_counter|making_coffee|checking_phone|grooming|currentActivity/.test(container.textContent), 'ambient activities have no visible debug labels')

@@ -68,12 +68,12 @@ export async function verifyMovementHarness(root, container, check, intervalCloc
       selector.dispatchEvent(new Event('change', { bubbles: true }))
     })
     const miraButtons = [...container.querySelectorAll('.movement-controls button')]
-    check(miraButtons.map(button => button.textContent).join(',') === 'notes_spot,fridge,window,Next →', 'Mira harness offers her own unique activity destinations and Next')
+    check(miraButtons.map(button => button.textContent).join(',') === 'notes_spot,fridge,window,counter_chat,Next →', 'Mira harness offers her own unique activity destinations and Next')
     check(container.querySelector('.route-debug').getAttribute('aria-label') === 'Mira waypoint graph', 'route debug switches to Mira')
-    for (const index of [1, 2, 0, 3]) {
+    for (const index of [1, 2, 3, 0, 4]) {
       await act(async () => miraButtons[index].click())
       const entity = container.querySelector('.npc-mira')
-      check(entity.dataset.location === (index === 3 ? 'fridge' : miraButtons[index].textContent), `Mira harness button ${index} immediately targets real activity location`)
+      check(entity.dataset.location === (index === 4 ? 'fridge' : miraButtons[index].textContent), `Mira harness button ${index} immediately targets real activity location`)
       check(window.matchMedia('(prefers-reduced-motion: reduce)').matches || entity.querySelector('.mira-visual').dataset.phase === 'walking', 'Mira immediately plays walking frames without ambient delay')
       await finishMovement([entity])
     }

@@ -13,6 +13,8 @@ export const HUMAN_MOVEMENT = Object.freeze({
 export const KAI_MOVEMENT = HUMAN_MOVEMENT // Keep the accepted Kai contract stable.
 export const WALK_FRAME_MS = 1000 / HUMAN_MOVEMENT.fps
 export const WALK_CYCLE_MS = WALK_FRAME_MS * HUMAN_MOVEMENT.frames
+// Snap only imperceptible endpoint remainders, measured in original art pixels.
+export const MIN_WALK_DISTANCE = 2
 
 export function getMovementDistance(previous, target) {
   return Math.hypot((target.x - previous.x) * scene.width / 100,
@@ -21,7 +23,7 @@ export function getMovementDistance(previous, target) {
 
 export function getMovementDuration(previous, target, config = HUMAN_MOVEMENT) {
   const distance = getMovementDistance(previous, target)
-  if (!distance) return 0
+  if (distance <= MIN_WALK_DISTANCE) return 0
   const rawMs = distance / config.pixelsPerSecond * 1000
   // End on a complete four-frame cycle rather than cutting off a lifted foot.
   const cycleMs = 1000 / config.fps * config.frames

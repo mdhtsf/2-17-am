@@ -18,6 +18,7 @@ export const npcActivityVisuals = Object.freeze({
     checking_phone: pose('mira', 1, 285.5, 622, 552),
     choosing_drink: pose('mira', 2, 337, 592, 561),
     staring_out_window: pose('mira', 3, 297.5, 585, 554),
+    talking_to_kai: null, // Quiet neutral stance at the counter opening.
   }),
 })
 

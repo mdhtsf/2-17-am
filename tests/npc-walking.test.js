@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { getMovementDirection, getMovementDistance, getMovementDuration, KAI_MOVEMENT, WALK_CYCLE_MS } from '../src/game/npcMovement.js'
+import { getMovementDirection, getMovementDistance, getMovementDuration, KAI_MOVEMENT, WALK_CYCLE_MS, MIN_WALK_DISTANCE } from '../src/game/npcMovement.js'
 import { getKaiWalkingVisual } from '../src/data/kaiWalking.js'
 
 test('direction uses the dominant anchor axis and does not mutate anchors', () => {
@@ -36,13 +36,19 @@ test('Kai duration grows with art-space distance and ends on whole cycles', () =
   assert.equal(long, short * 4)
   assert.equal(getMovementDistance(origin, { x: 10, y: 0 }), 153.6)
   assert.equal(getMovementDuration(origin, origin), 0)
-  for (const x of [0.001, 1, 10, 30, 60, 100]) {
+  for (const x of [1, 10, 30, 60, 100]) {
     const duration = getMovementDuration(origin, { x, y: x })
     assert.equal(duration % WALK_CYCLE_MS, 0)
     assert.ok(duration >= KAI_MOVEMENT.minDurationMs && duration <= KAI_MOVEMENT.maxDurationMs)
   }
-  assert.equal(getMovementDuration(origin, { x: 0.001, y: 0 }), KAI_MOVEMENT.minDurationMs)
+  assert.equal(getMovementDuration(origin, { x: 0.001, y: 0 }), 0)
   assert.equal(getMovementDuration(origin, { x: 100, y: 100 }), KAI_MOVEMENT.maxDurationMs)
+})
+
+test('only imperceptible endpoint corrections skip the walk cycle', () => {
+  const origin = { x: 0, y: 0 }
+  assert.equal(getMovementDuration(origin, { x: MIN_WALK_DISTANCE / 1536 * 100, y: 0 }), 0)
+  assert.equal(getMovementDuration(origin, { x: (MIN_WALK_DISTANCE + 0.1) / 1536 * 100, y: 0 }), KAI_MOVEMENT.minDurationMs)
 })
 
 test('direction uses scene aspect and stays deterministic on diagonal segments', () => {

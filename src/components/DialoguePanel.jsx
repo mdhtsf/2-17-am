@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import CharacterPortrait from './CharacterPortrait.jsx'
 import { sendChat } from '../lib/chat'
 import { MAX_MESSAGE_LENGTH } from '../../shared/npcs.js'
 
@@ -48,6 +49,8 @@ export default function DialoguePanel({ character, history, activity, onComplete
   }
 
   return <section className="dialogue" aria-label={`与${character.dialogueName}对话`}>
+    <CharacterPortrait npcId={character.id} />
+    <div className="dialogue-body">
     <div className="dialogue-identity">
       <h2>{character.dialogueName}</h2><span>{character.role}</span>
     </div>
@@ -76,6 +79,7 @@ export default function DialoguePanel({ character, history, activity, onComplete
     </form>
     <div className="request-status" role="status">{loading ? '…' : ''}</div>
     {error && <p id="dialogue-error" className="dialogue-error" role="alert">{error}</p>}
+    </div>
     <button className="close-dialogue" ref={closeRef} onClick={onClose} aria-label="关闭对话">×</button>
     <span className="dialogue-corner" aria-hidden="true">▾</span>
   </section>
