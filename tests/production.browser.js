@@ -24,7 +24,7 @@ const open = async () => {
   win.addEventListener('error', e => errors.push(e.message))
   win.addEventListener('unhandledrejection', e => errors.push(String(e.reason)))
   const fetch = win.fetch.bind(win)
-  win.fetch = (url, options) => { requests.push(JSON.parse(options.body)); return fetch(url, options) }
+  win.fetch = (url, options) => { if (url === '/api/chat') requests.push(JSON.parse(options.body)); return fetch(url, options) }
   await until(() => doc.querySelectorAll('.npc').length === 3, 'initial characters')
 }
 const click = async selector => { doc.querySelector(selector).click(); await pause(50) }
@@ -60,12 +60,19 @@ try {
     'cold sample includes walking and decoded activity visuals')
   await click('.npc-kai')
   check(doc.querySelector('h2').textContent === 'KAI', 'Kai dialogue opens')
+  let worldDebug = 0
+  win.addEventListener('world-event-debug', () => worldDebug++)
+  win.dispatchEvent(new win.CustomEvent('world-event-trigger', { detail: { id: 'door_noise' } }))
+  await pause(50)
+  check(worldDebug === 0 && !doc.querySelector('[aria-label="World event development controls"]'), 'production ignores world debug triggers and contains no event controls')
+  check(win.getComputedStyle(doc.querySelector('[data-sound-toggle]')).pointerEvents === 'auto', 'production mute control remains physically clickable')
   check(doc.querySelector('[data-portrait="kai"] img')?.complete, 'cold scene preloads the Kai portrait before opening')
   await send('今晚忙吗？')
   check(doc.querySelector('.request-status').textContent === '…', 'real HTTP request shows loading')
   doc.querySelector('form').requestSubmit()
   await until(() => doc.querySelector('.spoken').textContent === '夜班。总得有人醒着。', 'Kai reply')
   check(requests.length === 1, 'rapid repeat submit sends one HTTP request')
+  check(!Object.hasOwn(requests[0], 'recentWorldEvent'), 'development event injection cannot alter production dialogue context')
   await send('再聊一句')
   await until(() => doc.querySelector('input').value === '', 'second reply')
   check(requests.at(-1).history.length === 2 && requests.at(-1).activity === 'behind_counter', 'second request includes prior turn and returned counter activity')
@@ -86,6 +93,8 @@ try {
   for (const [width, height] of [[1280, 720], [1440, 900], [1024, 768], [390, 844]]) {
     frame.width = width; frame.height = height
     await pause(100)
+    const soundBox = doc.querySelector('[data-sound-toggle]').getBoundingClientRect()
+    check(soundBox.left >= 0 && soundBox.right <= width && soundBox.top >= 0, `${width}x${height}: sound control fits viewport`)
     const panel = doc.querySelector('.dialogue')
     const box = panel.getBoundingClientRect()
     check(box.top >= 0 && box.bottom <= height && box.left >= 0 && box.right <= width && panel.scrollWidth <= panel.clientWidth + 1,

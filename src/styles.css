@@ -336,3 +336,10 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .npc[data-speaking] .npc-label, .npc[data-speaking] .npc-indicator { opacity: 0; }
 @keyframes overheard-in { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 760px) { .ambient-speech { max-width: 160px; font-size: 10px; } }
+
+/* The sound toggle belongs to the existing HUD, not a separate settings panel. */
+.header-ambience { display: flex; align-items: center; gap: 20px; }
+.sound-toggle { pointer-events: auto; color: #aca69d; background: transparent; border: 0; padding: 8px 2px; font: inherit; font-size: 10px; letter-spacing: 1px; cursor: pointer; white-space: nowrap; }
+.sound-toggle:hover { color: #f0d7ae; }
+.sound-toggle:focus-visible { outline: 1px solid #f0d7ae; outline-offset: 4px; }
+@media (max-width: 640px) { .header-ambience { gap: 8px; } .sound-toggle { font-size: 9px; } }

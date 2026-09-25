@@ -1,3 +1,4 @@
+import { verifyWorldEvents } from './world-events.browser.jsx'
 import { verifyCounterSocial } from './counter-social.browser.jsx'
 import { verifyPortraits } from './portraits.browser.jsx'
 import { verifyFiniteActivities } from './finite-activities.browser.jsx'
@@ -69,6 +70,7 @@ const spoken = () => container.querySelector('.spoken').textContent
 
 try {
   await Promise.all(npcSpriteAssets.map(loadSprite))
+  await verifyWorldEvents(root, container, check)
   await verifyDemoPolish(root, container, check)
   await verifySpriteReadiness(root, container, check)
   await verifyCounterSocial(root, container, check, intervalClock)

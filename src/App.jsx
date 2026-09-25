@@ -5,6 +5,7 @@ import CharacterPortrait from './components/CharacterPortrait.jsx'
 import { characters, catFeedback } from './data/characters'
 import { MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 import { useNpcActivities } from './hooks/useNpcActivities.js'
+import { useSoundscape } from './hooks/useSoundscape.js'
 
 export default function App() {
   const [selectedId, setSelectedId] = useState(null)
@@ -13,6 +14,7 @@ export default function App() {
   const [histories, setHistories] = useState({ kai: [], mira: [] })
   // Only the selected semantic activity enters dialogue; rendering state stays local.
   const ambientRuntime = useNpcActivities({ interactingId: selectedId, catInteracting: catActive })
+  const sound = useSoundscape(ambientRuntime.recentWorldEvent?.id, ambientRuntime.recentWorldEvent?.sequence)
 
   function completeTurn(npc, message, reply) {
     setHistories(previous => ({
@@ -46,7 +48,12 @@ export default function App() {
   return <main className="game">
     <header className="game-header">
       <div className="game-title"><h1>2:17 <span>AM</span><i /></h1><p>Somewhere, someone is still awake.</p></div>
-      <span className="weather-readout"><i /> RAIN, 14°C <span>SEPTEMBER / NIGHT 01</span></span>
+      <div className="header-ambience"><span className="weather-readout"><i /> RAIN, 14°C <span>SEPTEMBER / NIGHT 01</span></span>
+        <button type="button" className="sound-toggle" data-sound-toggle
+          aria-label={sound.muted ? '开启环境音' : '关闭环境音'} aria-pressed={sound.muted}
+          title={sound.status === 'unavailable' ? '当前浏览器无法播放环境音' : '环境音'} onClick={sound.toggleMuted}>
+          {sound.muted ? 'SOUND OFF' : 'SOUND ON'}
+        </button></div>
     </header>
     <div className="world-viewport">
       <div className="location-caption" aria-hidden="true"><span className="moon">☾</span><div>AFTER HOURS<small>A small corner<br/>for the restless.</small></div></div>
@@ -56,7 +63,7 @@ export default function App() {
         onCatMovementChange={ambientRuntime.movementObservers.cat} />
       <div className="interaction-area">
         {selectedId
-          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} activity={ambientRuntime.completedActivities[selectedId] === ambientRuntime.activities[selectedId] ? undefined : ambientRuntime.activities[selectedId]} onComplete={completeTurn} onClose={closeDialogue} />
+          ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} activity={ambientRuntime.completedActivities[selectedId] === ambientRuntime.activities[selectedId] ? undefined : ambientRuntime.activities[selectedId]} getRecentWorldEvent={ambientRuntime.getRecentWorldEvent} onComplete={completeTurn} onClose={closeDialogue} />
           : <div className="scene-invitation"><span>· · ·</span><p>No rush. The rain isn’t going anywhere.</p><small>点击角色，聊上几句</small></div>}
       </div>
     </div>

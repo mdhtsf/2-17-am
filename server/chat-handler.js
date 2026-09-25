@@ -1,6 +1,7 @@
 import { npcs, MAX_MESSAGE_LENGTH, MAX_HISTORY_MESSAGES } from '../shared/npcs.js'
 import { replyToNpc, DialogueServiceError } from './openrouter.js'
 import { validNpcActivity } from './npc-activity-context.js'
+import { validWorldEvent } from '../shared/worldEvents.js'
 
 function validHistory(history) {
   return Array.isArray(history) && history.length <= MAX_HISTORY_MESSAGES &&
@@ -40,10 +41,12 @@ export function createChatHandler(provider = replyToNpc) {
         return respond(400, { error: '对话记录格式不正确。' })
       }
       if (!validNpcActivity(npc, body.activity)) return respond(400, { error: '角色活动格式不正确。' })
+      if (!validWorldEvent(body.recentWorldEvent)) return respond(400, { error: '环境事件格式不正确。' })
       const reply = await provider({
         npc: npcs[npc], message: message.trim(),
         history: history.map(({ role, content }) => ({ role, content })),
         ...(body.activity === undefined ? {} : { activity: body.activity }),
+        ...(body.recentWorldEvent === undefined ? {} : { recentWorldEvent: body.recentWorldEvent }),
       })
       if (typeof reply !== 'string' || !reply.trim() || reply.length > 4000) {
         throw new Error('Invalid provider reply')

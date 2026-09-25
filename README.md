@@ -724,3 +724,26 @@ Transport, timeouts, JSON mode/schema, curated fallback, model, temperature 0.95
 Final-prompt real server validation: 2/3 requests returned `source: llm`, 1/3 returned `source: fallback` with `openrouter_provider_error`. Outputs are not guaranteed to be polished: occasional awkward wording/typos and semantic repetition remain possible with the current model. Initial qualitative samples prompted stronger constraints against invented special facilities and abstract poetic imagery; no output is silently rewritten. The recent-topic matcher is deliberately heuristic, not semantic memory.
 
 Quality-pass verification: 238 Node tests and 958 browser/runtime checks passed; browser Console had no error/warning. Production build and `git diff --check` passed. No commit/tag/push.
+
+### Stage 5 — Living World
+
+世界现在每 **45–90 秒**出现一次随机事件机会：`rain_intensifies`、`rain_softens`、`door_noise`、`quiet_lull`。相邻机会避免相同事件；忙碌机会只保留环境变化，不积压 NPC 反应。最新事件在当前页面中保留 **30 秒**，刷新清空；没有数据库或长期记忆。
+
+原生 Web Audio 播放本地 CC0 雨声录音，没有持续室内底噪。首次真实点击/按键才加载、解码并循环，约 2 秒渐入；SOUND ON/OFF 使用 0.2 秒渐变。雨声柔和/基础/增强 gain 为 0.22/0.4/0.7，master 为 0.65，雨势以 3 秒绝对目标渐变；quiet_lull 恢复基础雨声。门响为 0.7 秒短提示，峰值 gain 0.16，同一时间最多一个，静音/未解锁/挂起时不补播。资源失败不影响游戏。素材许可、处理方式见 [音频说明](public/assets/audio/README.md)；最终听感仍需人工验收。
+
+世界反应复用原 Director 的 reservation 和原活动/路线，最多选择一位安全角色：Kai 只在已经回到柜台的普通姿态下原地回应；Mira 可看窗外，只有在冷柜旁才回应冷柜声；Cat 可以看门但不会说人话，也不会被世界事件主动叫醒。移动候选拒绝长距离路线。玩家交互和正在进行的社交优先；无安全候选或 Director 正忙时不强迫反应。普通 Director 时间、Kai 短任务/回柜台、社交 LLM 与 fallback、人物图片、移动和遮挡保持原有规则。
+
+有合适候选时以 **50%** 概率反应；选中 Kai/Mira 后以 **50%** 概率使用短气泡，约 **2.5 秒**自动消失，候选台词避免立即复读。Cat 没有台词，quiet_lull 没有角色反应。气泡在实际到达后出现；玩家介入立即清理自己的环境气泡。环境与社交气泡分别持有状态，不互相清除。环境短句来自本地变体池，不增加 LLM 请求。
+
+玩家 `/api/chat` 可选接收 `recentWorldEvent` 语义 ID。服务器只接受五种白名单值并生成受控描述，放在活动上下文后、history 前；只在相关时自然提及，不给客户端传入任意 prompt 的能力。缺失字段兼容旧客户端，非法值返回 400。客户端每次发送/重试重新检查事件有效期，不发送过期事件；在途回复仍按发送时快照完成。TTL 是浏览器会话规则，服务端没有存储事件时间，不能独立证明客户端声称的事件何时发生。OpenRouter 模型与原 fallback/timeout 不变。
+
+本地验收入口（先运行 `npm run dev -- --host 127.0.0.1 --port 5176 --strictPort`）：
+
+- 主场景：`http://127.0.0.1:5176/`
+- 世界事件开发页：`http://127.0.0.1:5176/tests/world-preview.html`
+- 世界独立自动回归：`http://127.0.0.1:5176/tests/world-runtime.html`
+- 完整浏览器回归：`http://127.0.0.1:5176/tests/runtime.browser.html`
+
+开发页可即时触发全部四事件，显示 EVENT / RESPONDER / BARK / AUDIO STATE 和跳过原因。手动触发保留概率、路线限制与交互锁，因此“没有角色反应”也是正常结果。生产构建不包含调试触发 listener 或调试面板。Vite 端口只提供前端；真实玩家/社交 LLM 仍需既有 Vercel 本地后端。无需真实 API 的生产回归使用 `node tests/cold-assets-server.mjs`，随后打开 `http://127.0.0.1:5187/__demo__/production.browser.html`，该服务仅使用测试回复。
+
+Stage 5 最终验证：**261 项 Node 测试、977 项完整浏览器检查（含 19 项世界专用检查）、41 项生产流程检查**通过，冷加载可见性采样 **160 次**。build / diff check 通过。运行时与独立生产主页 Console 无 error/warning；生产 iframe 自动化日志的一条 MutationObserver 报错、真实模型与主观音质的验收边界详见 [完整实施报告](docs/stage-5-implementation-report.md)。未 commit/tag/push。

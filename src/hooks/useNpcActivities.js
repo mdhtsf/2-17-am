@@ -5,6 +5,8 @@ import { nextNpcActivity } from '../game/npcActivityTransitions.js'
 import { createCounterCoherence } from '../game/counterCoherence.js'
 import { createFiniteActivities } from '../game/finiteActivities.js'
 import { createAmbientDirector } from '../game/ambientDirector.js'
+import { createWorldEvents } from '../game/worldEvents.js'
+import { worldEventIds } from '../../shared/worldEvents.js'
 
 export function npcActivityReducer(activities, action) {
   if (action.type === 'reset') return createInitialNpcActivities()
@@ -38,10 +40,17 @@ export function useNpcActivities({ interactingId = null, catInteracting = false 
     getActivities: () => latest.current,
     onActivity: setNpcActivity,
   }))
-  const [speech, setSpeech] = useState(null)
+  const [socialSpeech, setSocialSpeech] = useState(null)
+  const [worldSpeech, setWorldSpeech] = useState(null)
+  const [recentWorldEvent, setRecentWorldEvent] = useState(null)
   const [coherence] = useState(() => createCounterCoherence({
     onDebug: import.meta.env.DEV ? detail => window.dispatchEvent(new CustomEvent('counter-social-debug', { detail })) : undefined,
-    generate: requestSocialDialogue, director, getActivities: () => latest.current, assign: setNpcActivity, onSpeech: setSpeech,
+    generate: requestSocialDialogue, director, getActivities: () => latest.current, assign: setNpcActivity, onSpeech: setSocialSpeech,
+  }))
+  const [world] = useState(() => createWorldEvents({
+    director, getActivities: () => latest.current, assign: setNpcActivity,
+    onEvent: setRecentWorldEvent, onSpeech: setWorldSpeech,
+    onDebug: import.meta.env.DEV ? detail => window.dispatchEvent(new CustomEvent('world-event-debug', { detail })) : undefined,
   }))
   const [completedActivities, setCompletedActivities] = useState({})
   const [finite] = useState(() => createFiniteActivities({
@@ -56,18 +65,29 @@ export function useNpcActivities({ interactingId = null, catInteracting = false 
       director.reportMovement(id, movement)
       if (activity) finite.report(id, activity, movement)
       coherence.report(id, movement)
+      world.report(id, movement)
     }])))
   useLayoutEffect(() => {
     const locks = [interactingId || (catInteracting ? 'cat' : null)]
     director.setInteractionLocks(locks)
     coherence.setInteractionLocks(locks)
-  }, [director, coherence, interactingId, catInteracting])
+    world.setInteractionLocks(locks)
+  }, [director, coherence, world, interactingId, catInteracting])
   useEffect(() => {
     director.start()
     finite.start()
     coherence.start()
-    return () => { director.stop(); finite.stop(); coherence.stop() }
-  }, [director, finite, coherence])
+    world.start()
+    return () => { world.stop(); coherence.stop(); finite.stop(); director.stop() }
+  }, [director, finite, coherence, world])
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const trigger = event => { if (worldEventIds.includes(event.detail?.id)) world.trigger(event.detail.id) }
+    window.addEventListener('world-event-trigger', trigger)
+    return () => window.removeEventListener('world-event-trigger', trigger)
+  }, [world])
 
-  return { activities, completedActivities, speech, getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities, movementObservers }
+  return { activities, completedActivities, speech: socialSpeech || worldSpeech,
+    recentWorldEvent, getRecentWorldEvent: world.getRecentWorldEvent,
+    getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities, movementObservers }
 }

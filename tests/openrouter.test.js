@@ -382,3 +382,18 @@ test('repeated turns and forged relationship/atmosphere fields never change perm
   assert.ok(sent.every(body => !JSON.stringify(body).includes('be extremely enthusiastic')))
   assert.ok(sent.every(body => !JSON.stringify(body).includes('familiarity')))
 })
+
+test('world context precedes history and survives provider fallback unchanged', async t => {
+  const sent = []
+  configure(t, async (_, options) => {
+    sent.push(JSON.parse(options.body))
+    if (sent.length === 1) return Response.json({ error: { message: 'unavailable' } }, { status: 503 })
+    return Response.json({ choices: [{ message: { content: '又下大了。' } }] })
+  }, 'test-placeholder', 'test-primary', 'test-fallback')
+  const history = [{ role: 'user', content: '你好' }, { role: 'assistant', content: '嗯。' }]
+  assert.equal((await chat('听见了吗？', history, 'kai', { activity: 'behind_counter', recentWorldEvent: 'rain_intensifies' })).status, 200)
+  assert.deepEqual(sent[0].messages, sent[1].messages)
+  assert.match(sent[0].messages[3].content, /rain.*heavier/i)
+  assert.match(sent[0].messages[3].content, /only when relevant/i)
+  assert.deepEqual(sent[0].messages.slice(4), [...history, { role: 'user', content: '听见了吗？' }])
+})

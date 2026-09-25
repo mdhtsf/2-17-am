@@ -19,7 +19,7 @@ const chat = createChatHandler(async ({ npc, message }) => {
   return npc.id === 'kai' ? '夜班。总得有人醒着。' : '理论上快写完了。一个小时前我也是这么说的。'
 })
 const social = createSocialHandler(async () => ({ lines: [{ speaker: 'mira', text: '光标还在闪。' }, { speaker: 'kai', text: '还没下班。' }] }))
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' }
+const mime = { '.mp3': 'audio/mpeg', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' }
 createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost')
   if (['/api/chat', '/api/social-chat'].includes(url.pathname)) {
