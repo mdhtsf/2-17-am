@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import CharacterPortrait from './CharacterPortrait.jsx'
 import { sendChat } from '../lib/chat'
 import { MAX_MESSAGE_LENGTH } from '../../shared/npcs.js'
+import { slowReplyLine } from '../data/dialogueFallbacks.js'
 
 export default function DialoguePanel({ character, history, activity, getRecentWorldEvent, onComplete, onClose }) {
   const [preset, setPreset] = useState(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [slowReply, setSlowReply] = useState(null)
   const closeRef = useRef(null)
   const inputRef = useRef(null)
   const requestRef = useRef(null)
@@ -15,7 +17,12 @@ export default function DialoguePanel({ character, history, activity, getRecentW
 
   useEffect(() => {
     closeRef.current?.focus()
-    return () => { requestRef.current?.abort(); requestRef.current = null }
+    return () => {
+      const request = requestRef.current
+      requestRef.current = null
+      clearTimeout(request?.timeout)
+      request?.controller.abort()
+    }
   }, [])
 
   async function submit(event) {
@@ -23,25 +30,37 @@ export default function DialoguePanel({ character, history, activity, getRecentW
     const text = message.trim()
     if (!text || text.length > MAX_MESSAGE_LENGTH || requestRef.current) return
     const controller = new AbortController()
-    requestRef.current = controller // Immediate lock also covers rapid Enter presses.
+    const request = { controller, timeout: null }
+    requestRef.current = request // Immediate lock also covers rapid Enter presses.
     setLoading(true)
     setError('')
-    const timeout = setTimeout(() => controller.abort(), 60000)
+    request.timeout = setTimeout(() => {
+      if (requestRef.current !== request) return
+      // Invalidate and settle the UI before aborting: transport cancellation may
+      // arrive late (or never). It must not block retry or overwrite a newer turn.
+      requestRef.current = null
+      controller.abort()
+      setSlowReply(slowReplyLine(character.id))
+      setPreset(null)
+      setLoading(false)
+      inputRef.current?.focus()
+    }, 8000)
     try {
       const reply = await sendChat({ npc: character.id, message: text, history, activity,
         recentWorldEvent: getRecentWorldEvent?.(), signal: controller.signal })
-      if (requestRef.current !== controller) return
+      if (requestRef.current !== request) return
       if (controller.signal.aborted) throw new Error('Dialogue request aborted')
       onComplete(character.id, text, reply)
       setPreset(null)
+      setSlowReply(null)
       setMessage('')
     } catch {
-      if (requestRef.current === controller) {
+      if (requestRef.current === request) {
         setError('雨声有点大，刚才那句没传过去。再试一次？')
       }
     } finally {
-      clearTimeout(timeout)
-      if (requestRef.current === controller) {
+      clearTimeout(request.timeout)
+      if (requestRef.current === request) {
         requestRef.current = null
         setLoading(false)
         inputRef.current?.focus()
@@ -56,12 +75,12 @@ export default function DialoguePanel({ character, history, activity, getRecentW
       <h2>{character.dialogueName}</h2><span>{character.role}</span>
     </div>
     <div className="dialogue-content" aria-live="polite">
-      <p className="spoken">{preset !== null ? character.replies[preset].text : lastReply || character.opening}</p>
-      <p className="stage-direction">{preset !== null || lastReply ? '你们安静了一会儿，只听见雨声。' : character.detail}</p>
+      <p className="spoken">{slowReply || (preset !== null ? character.replies[preset].text : lastReply || character.opening)}</p>
+      <p className="stage-direction">{slowReply || preset !== null || lastReply ? '你们安静了一会儿，只听见雨声。' : character.detail}</p>
       <div className="replies">
         {character.replies.map((item, i) => <button
           key={item.label} disabled={loading} aria-pressed={preset === i}
-          onClick={() => { setPreset(i); setError('') }}
+          onClick={() => { setPreset(i); setSlowReply(null); setError('') }}
         ><span aria-hidden="true">▸</span> {item.label}</button>)}
       </div>
     </div>

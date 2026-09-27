@@ -343,3 +343,7 @@ h1 i { display: inline-block; width: 5px; height: 5px; background: #edc596; vert
 .sound-toggle:hover { color: #f0d7ae; }
 .sound-toggle:focus-visible { outline: 1px solid #f0d7ae; outline-offset: 4px; }
 @media (max-width: 640px) { .header-ambience { gap: 8px; } .sound-toggle { font-size: 9px; } }
+
+/* Short local cat poses share the original footprint and foreground masks. */
+.cat-micro { position: absolute; inset: 0; overflow: hidden; }
+.cat-micro img { position: absolute; display: block; max-width: none; height: auto; image-rendering: pixelated; }

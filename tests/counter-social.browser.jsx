@@ -3,7 +3,10 @@ import App from '../src/App.jsx'
 
 export async function verifyCounterSocial(root, container, check, clock) {
   const originalSet = window.setTimeout, originalClear = window.clearTimeout
-  const originalFetch = window.fetch
+  const originalFetch = window.fetch, originalRandom = Math.random
+  let presentationDraw = 0.7
+  const presentationDraws = []
+  Math.random = () => presentationDraws.length ? presentationDraws.shift() : originalRandom()
   let requests = 0
   let releaseGrace
   const debug = []
@@ -16,10 +19,11 @@ export async function verifyCounterSocial(root, container, check, clock) {
     const context = JSON.parse(options.body)
     check(Object.keys(context).sort().join(',') === 'kaiActivity,miraActivity,miraPreviousActivity,recentExchanges', 'only semantic activity context is sent')
     if (requests === 3) return new Promise(resolve => { releaseGrace = () => resolve(Response.json({ lines: [{ speaker: 'kai', text: '冰箱比人精神。' }, { speaker: 'mira', text: '它没有论文。' }] })) })
-    if (requests === 2 || requests === 4) {
+    if (requests === 2 || requests === 4 || requests === 6) {
       interruptedSignal = options.signal
       return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), { once: true }))
     }
+    if (requests === 5) return Response.json({ lines: [{ speaker: 'mira', text: '那本笔记先放这儿。' }, { speaker: 'kai', text: '好。' }] })
     return Response.json({ lines: [
       { speaker: 'mira', text: '光标又停住了。' }, { speaker: 'kai', text: '它也值夜班。' }, { speaker: 'mira', text: '那让它歇会儿。' },
     ] })
@@ -35,6 +39,7 @@ export async function verifyCounterSocial(root, container, check, clock) {
     const entry = [...timers].find(([, timer]) => timer.ms === ms)
     check(Boolean(entry), `social ${ms}ms timer exists`)
     timers.delete(entry[0])
+    if (ms === 90000) presentationDraws.push(presentationDraw)
     await act(async () => entry[1].fn())
   }
   const finish = async entity => {
@@ -51,7 +56,9 @@ export async function verifyCounterSocial(root, container, check, clock) {
     check([...timers.values()].filter(t => t.ms === 90000).length === 1, 'Strict Mode keeps one rare opportunity timer')
     const kai = container.querySelector('.npc-kai'), mira = container.querySelector('.npc-mira')
     const kaiStart = kai.getAttribute('style')
-    await fire(90000)
+    presentationDraws.push(presentationDraw)
+    await act(async () => window.dispatchEvent(new Event('counter-social-trigger')))
+    check([...timers.values()].filter(t => t.ms === 90000).length === 1, 'explicit preview trigger leaves one fresh social cooldown')
     check(mira.dataset.activity === 'talking_to_kai' && clock.timers.size === 0, 'social approach reserves the normal major-event gate')
     check(!container.querySelector('.ambient-speech') && requests === 1, 'generation starts during approach without premature speech')
     await finish(mira)
@@ -96,7 +103,31 @@ export async function verifyCounterSocial(root, container, check, clock) {
     check(Boolean(container.querySelector('.ambient-speech')), 'timeout uses curated speech instead of waiting indefinitely')
     await act(async () => kai.click())
     check(!container.querySelector('.ambient-speech'), 'player interruption clears timeout fallback too')
+    await act(async () => container.querySelector('.close-dialogue').click())
+    await finish(mira)
+    presentationDraw = 0
+    const remoteKaiStart = kai.getAttribute('style'), remoteMiraStart = mira.getAttribute('style')
+    await fire(90000)
+    check(mira.dataset.activity === 'reading_notes' && mira.dataset.location === 'notes_spot', 'remote social mode preserves Mira activity and location')
+    check(kai.getAttribute('style') === remoteKaiStart && mira.getAttribute('style') === remoteMiraStart, 'remote speech makes no unnecessary NPC movement')
+    check(clock.timers.size === 0 && debug.at(-1).presentation === 'remote', 'remote event holds the same reservation for both participants')
+    check(debug.at(-1).source === 'llm' && container.querySelector('.ambient-speech')?.textContent === '那本笔记先放这儿。', 'remote mode uses the existing LLM pipeline and speaker bubbles')
+    await fire(2200)
+    check(container.querySelector('.ambient-speech')?.closest('.npc-kai'), 'remote response follows Kai at the counter')
+    await fire(2200)
+    check(!container.querySelector('.ambient-speech') && clock.timers.size === 1, 'remote exchange releases reservation without a return trip')
+    check(kai.getAttribute('style') === remoteKaiStart && mira.getAttribute('style') === remoteMiraStart, 'remote cleanup preserves both positions')
+    await fire(90000)
+    check(!container.querySelector('.ambient-speech') && clock.timers.size === 0, 'remote pending generation remains quiet and reserved')
+    await act(async () => mira.click())
+    check(interruptedSignal?.aborted && !container.querySelector('.ambient-speech'), 'player interaction aborts remote generation immediately')
+    check(mira.dataset.activity === 'reading_notes' && mira.getAttribute('style') === remoteMiraStart, 'remote interruption never assigns a social or restoration walk')
+    await act(async () => container.querySelector('.close-dialogue').click())
+    check(clock.timers.size === 1, 'ambient scheduling remains available after remote interaction ends')
     await act(async () => root.render(null))
     check(timers.size === 0 && !container.querySelector('.ambient-speech'), 'unmount removes social timers and bubbles')
-  } finally { window.removeEventListener('counter-social-debug', onDebug); window.setTimeout = originalSet; window.clearTimeout = originalClear; window.fetch = originalFetch }
+    const requestsAfterStop = requests
+    await act(async () => window.dispatchEvent(new Event('counter-social-trigger')))
+    check(requests === requestsAfterStop && timers.size === 0, 'unmounted preview trigger cannot revive social work')
+  } finally { window.removeEventListener('counter-social-debug', onDebug); window.setTimeout = originalSet; window.clearTimeout = originalClear; window.fetch = originalFetch; Math.random = originalRandom }
 }

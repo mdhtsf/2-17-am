@@ -1,4 +1,6 @@
 import { verifyWorldEvents } from './world-events.browser.jsx'
+import { verifyDialoguePolish } from './dialogue-polish.browser.jsx'
+import { verifyCatMicro } from './cat-micro.browser.jsx'
 import { verifyCounterSocial } from './counter-social.browser.jsx'
 import { verifyPortraits } from './portraits.browser.jsx'
 import { verifyFiniteActivities } from './finite-activities.browser.jsx'
@@ -27,6 +29,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const output = document.getElementById('results')
 const container = document.getElementById('test-root')
 const root = createRoot(container)
+const wallSetTimeout = window.setTimeout
 const intervalClock = installAmbientClock()
 const checks = []
 const check = (condition, label) => {
@@ -37,9 +40,15 @@ const requests = []
 let mode = 'success'
 let pending
 let expireRequest
+let submitting = false
 const originalSetTimeout = window.setTimeout
 window.setTimeout = (callback, delay, ...args) => {
-  if (delay === 60000) expireRequest = callback
+  // Player deadlines and first ambient deadlines now both use 8s. Keep the
+  // transport on wall time while advancing only the ambient fixture clock.
+  if (delay === 8000 && submitting) {
+    expireRequest = callback
+    return wallSetTimeout(callback, delay, ...args)
+  }
   return originalSetTimeout(callback, delay, ...args)
 }
 const originalFetch = window.fetch
@@ -64,7 +73,10 @@ const fill = text => act(async () => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, text)
   input.dispatchEvent(new Event('input', { bubbles: true }))
 })
-const submit = () => act(async () => container.querySelector('form').requestSubmit())
+const submit = () => act(async () => {
+  submitting = true
+  try { container.querySelector('form').requestSubmit() } finally { submitting = false }
+})
 const say = async text => { await fill(text); await submit() }
 const spoken = () => container.querySelector('.spoken').textContent
 
@@ -75,6 +87,8 @@ try {
   await verifySpriteReadiness(root, container, check)
   await verifyCounterSocial(root, container, check, intervalClock)
   await verifyPortraits(root, container, check)
+  await verifyDialoguePolish(root, container, check)
+  await verifyCatMicro(root, container, check)
   await verifyFiniteActivities(root, container, check, intervalClock)
   await verifyInteractionCoherence(root, container, check, intervalClock)
   await verifyActivityVisuals(root, container, check)
@@ -156,7 +170,8 @@ try {
   mode = 'deferred'
   await say('超时后才到达')
   await act(async () => { expireRequest(); pending() })
-  check(spoken() === 'kai: 我叫西瓜。' && Boolean(container.querySelector('[role="alert"]')), 'late timed-out reply preserves history and uses existing error UI')
+  check(spoken() !== 'kai: 超时后才到达' && !container.querySelector('[role="alert"]') && !container.querySelector('[aria-label="发送"]').disabled,
+    'late timed-out reply cannot replace the in-world fallback or keep the input locked')
   const beforeInvalid = requests.length
   await say('x'.repeat(1001))
   check(requests.length === beforeInvalid, 'oversize input never calls API')

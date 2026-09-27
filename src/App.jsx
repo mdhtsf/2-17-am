@@ -60,7 +60,8 @@ export default function App() {
       <ConvenienceStoreScene selectedId={selectedId} onSelect={setSelectedId} catActive={catActive} onCat={greetCat} activities={ambientRuntime.activities} completedActivities={ambientRuntime.completedActivities} speech={ambientRuntime.speech}
         onKaiMovementChange={ambientRuntime.movementObservers.kai}
         onMiraMovementChange={ambientRuntime.movementObservers.mira}
-        onCatMovementChange={ambientRuntime.movementObservers.cat} />
+        onCatMovementChange={ambientRuntime.movementObservers.cat}
+        catMicroBlocked={Boolean(selectedId || catActive || ambientRuntime.recentWorldEvent)} />
       <div className="interaction-area">
         {selectedId
           ? <DialoguePanel key={selectedId} character={characters[selectedId]} history={histories[selectedId]} activity={ambientRuntime.completedActivities[selectedId] === ambientRuntime.activities[selectedId] ? undefined : ambientRuntime.activities[selectedId]} getRecentWorldEvent={ambientRuntime.getRecentWorldEvent} onComplete={completeTurn} onClose={closeDialogue} />

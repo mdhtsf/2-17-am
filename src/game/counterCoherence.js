@@ -16,7 +16,7 @@ export function createCounterCoherence({ director, getActivities, assign, onSpee
   const arrived = (id, destination) => movements.get(id)?.phase === 'idle' && movements.get(id)?.destination === destination
   const clearLine = () => { if (lineTimer !== null) clearTimer(lineTimer); lineTimer = null; onSpeech(null) }
   const clearRequestTimer = () => { if (requestTimer !== null) clearTimer(requestTimer); requestTimer = null }
-  const debug = (phase, extra = {}) => onDebug({ phase, attempt: social?.attempt, ...extra })
+  const debug = (phase, extra = {}) => onDebug({ phase, attempt: social?.attempt, presentation: social?.presentation, ...extra })
   const endSocial = () => { social?.request?.abort(); clearRequestTimer(); clearLine(); debug('finished'); social = null; director.release('counter-social') }
 
   function advance() {
@@ -33,6 +33,15 @@ export function createCounterCoherence({ director, getActivities, assign, onSpee
       assign('kai', 'behind_counter')
     }
     if (!social) return
+    // Remote speech borrows the reservation only: no activity assignment or return trip.
+    if (social.presentation === 'remote') {
+      if (activities.mira !== social.previous || activities.kai !== 'behind_counter'
+        || !arrived('mira', getNpcSceneLocation('mira', social.previous)) || !arrived('kai', 'counter')
+        || locked.includes('kai') || locked.includes('mira')) {
+        debug('interrupted'); endSocial()
+      }
+      return
+    }
     if (activities.mira !== 'talking_to_kai' && social.phase !== 'leaving') { endSocial(); return }
     if (activities.kai !== 'behind_counter' || locked.includes('kai') || locked.includes('mira')) {
       social.request?.abort()
@@ -64,7 +73,11 @@ export function createCounterCoherence({ director, getActivities, assign, onSpee
     if (!running || !social || social.phase !== 'speaking') return
     const current = social
     const line = current.exchange.lines[current.index]
-    if (!line) { clearLine(); current.phase = 'leaving'; advance(); return }
+    if (!line) {
+      if (current.presentation === 'remote') endSocial()
+      else { clearLine(); current.phase = 'leaving'; advance() }
+      return
+    }
     const index = current.index
     onSpeech({ ...line, key: `${current.exchange.id}:${current.index}` })
     lineTimer = setTimer(() => {
@@ -77,21 +90,24 @@ export function createCounterCoherence({ director, getActivities, assign, onSpee
   function scheduleOpportunity() {
     if (!running || opportunity !== null) return
     const token = {}
-    const timer = setTimer(() => {
+    const run = () => {
       if (!running || opportunity?.token !== token) return
       opportunity = null
       const activities = getActivities()
       if (!social && !returning && !pendingReturn && !locked.includes('kai') && !locked.includes('mira')
         && activities.mira !== 'talking_to_kai' && activities.kai === 'behind_counter' && arrived('kai', 'counter')
+        && arrived('mira', getNpcSceneLocation('mira', activities.mira))
         && director.reserve('counter-social')) {
+        const presentation = random() < COUNTER_SOCIAL.remoteProbability ? 'remote' : 'approach'
         const pool = counterConversations.filter(exchange => exchange.id !== lastExchange)
         const exchange = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))]
         lastExchange = exchange.id
-        social = { attempt: ++attemptNumber, phase: 'approaching', previous: activities.mira, exchange, index: 0, pending: Boolean(generate), reason: 'unavailable', startedAt: Date.now() }
+        social = { attempt: ++attemptNumber, presentation, phase: presentation === 'remote' ? 'waiting' : 'approaching', previous: activities.mira, exchange, index: 0, pending: Boolean(generate), reason: 'unavailable', startedAt: Date.now() }
         const current = social
         current.request = new AbortController()
-        debug('approaching')
-        assign('mira', 'talking_to_kai')
+        debug(current.phase)
+        if (presentation === 'approach') assign('mira', 'talking_to_kai')
+        else if (!current.pending) beginSpeech()
         if (generate) {
           debug('request_started')
           requestTimer = setTimer(() => {
@@ -134,8 +150,9 @@ export function createCounterCoherence({ director, getActivities, assign, onSpee
       }
       // Busy opportunities are skipped, never queued to compete on every idle tick.
       scheduleOpportunity()
-    }, delay(COUNTER_SOCIAL.opportunityMs))
-    opportunity = { timer, token }
+    }
+    const timer = setTimer(run, delay(COUNTER_SOCIAL.opportunityMs))
+    opportunity = { timer, token, run }
   }
   return {
     start() { running = true; scheduleOpportunity(); advance() },
@@ -148,6 +165,15 @@ export function createCounterCoherence({ director, getActivities, assign, onSpee
       clearLine()
       social = null; pendingReturn = null; returning = false
       director.release('counter-social'); director.release('counter-return')
+    },
+    // The dev preview can exercise the real opportunity without intercepting
+    // global timers. It retains every busy/interaction guard and the cooldown.
+    trigger() {
+      if (!running || !opportunity) return false
+      const previous = social, current = opportunity
+      clearTimer(current.timer)
+      current.run()
+      return social !== null && social !== previous
     },
     complete(id, activity) { if (finiteActivityDurations[id]?.[activity] && getActivities().kai === activity) { pendingReturn = activity; advance() } },
     report(id, movement) { movements.set(id, movement); advance() },

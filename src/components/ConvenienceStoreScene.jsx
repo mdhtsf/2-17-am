@@ -11,7 +11,7 @@ import { getNpcSceneLocation } from '../game/npcSceneLocation.js'
 import { getNpcSceneAnchor } from '../game/npcSceneAnchor.js'
 import { npcVisuals } from '../data/npcVisuals.js'
 
-export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat, activities, completedActivities, speech, onKaiMovementChange, onMiraMovementChange, onCatMovementChange, children }) {
+export default function ConvenienceStoreScene({ selectedId, onSelect, catActive, onCat, activities, completedActivities, speech, onKaiMovementChange, onMiraMovementChange, onCatMovementChange, catMicroBlocked = true, children }) {
   useEffect(() => { [...npcSpriteAssets, ...Object.values(npcPortraits).map(portrait => portrait.src)].forEach(loadSprite) }, [])
   return <section
     className="scene"
@@ -26,6 +26,7 @@ export default function ConvenienceStoreScene({ selectedId, onSelect, catActive,
         const logicalLocation = getNpcSceneLocation(npc.id, currentActivity)
         return <NPC
             key={npc.id}
+            catMicroBlocked={catMicroBlocked}
             onMovementChange={npc.id === 'kai' ? onKaiMovementChange : npc.id === 'mira' ? onMiraMovementChange : onCatMovementChange}
             npc={npc}
             speech={speech?.npcId === npc.id ? speech : null}

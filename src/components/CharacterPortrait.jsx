@@ -8,7 +8,9 @@ export default function CharacterPortrait({ npcId }) {
   useEffect(() => { loadSprite(portrait.src) }, [portrait.src])
   const { crop } = portrait
   return <aside className="portrait-column" aria-hidden="true">
-    <span className="character-portrait" data-portrait={npcId} style={{ aspectRatio: `${crop.width} / ${crop.height}` }}>
+    <span className="character-portrait" data-portrait={npcId} style={{
+      aspectRatio: `${crop.width} / ${crop.height}`, transform: portrait.flipX ? 'scaleX(-1)' : undefined,
+    }}>
       {ready ? <img src={portrait.src} alt="" draggable="false" style={{
         width: `${portrait.width / crop.width * 100}%`,
         left: `${-crop.x / crop.width * 100}%`, top: `${-crop.y / crop.height * 100}%`,

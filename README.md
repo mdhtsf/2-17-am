@@ -729,7 +729,7 @@ Quality-pass verification: 238 Node tests and 958 browser/runtime checks passed;
 
 世界现在每 **45–90 秒**出现一次随机事件机会：`rain_intensifies`、`rain_softens`、`door_noise`、`quiet_lull`。相邻机会避免相同事件；忙碌机会只保留环境变化，不积压 NPC 反应。最新事件在当前页面中保留 **30 秒**，刷新清空；没有数据库或长期记忆。
 
-原生 Web Audio 播放本地 CC0 雨声录音，没有持续室内底噪。首次真实点击/按键才加载、解码并循环，约 2 秒渐入；SOUND ON/OFF 使用 0.2 秒渐变。雨声柔和/基础/增强 gain 为 0.22/0.4/0.7，master 为 0.65，雨势以 3 秒绝对目标渐变；quiet_lull 恢复基础雨声。门响为 0.7 秒短提示，峰值 gain 0.16，同一时间最多一个，静音/未解锁/挂起时不补播。资源失败不影响游戏。素材许可、处理方式见 [音频说明](public/assets/audio/README.md)；最终听感仍需人工验收。
+原生 Web Audio 播放本地 CC0 雨声录音，没有持续室内底噪。首次真实点击/按键才加载、解码并循环，约 2 秒渐入；SOUND ON/OFF 使用 0.2 秒渐变。雨声柔和/基础/增强 gain 为 0.22/0.34/0.46（Final Polish 调整后），master 为 0.65，雨势以 3 秒绝对目标渐变；quiet_lull 恢复基础雨声。门响为 0.7 秒短提示，峰值 gain 0.16，同一时间最多一个，静音/未解锁/挂起时不补播。资源失败不影响游戏。素材许可、处理方式见 [音频说明](public/assets/audio/README.md)；最终听感仍需人工验收。
 
 世界反应复用原 Director 的 reservation 和原活动/路线，最多选择一位安全角色：Kai 只在已经回到柜台的普通姿态下原地回应；Mira 可看窗外，只有在冷柜旁才回应冷柜声；Cat 可以看门但不会说人话，也不会被世界事件主动叫醒。移动候选拒绝长距离路线。玩家交互和正在进行的社交优先；无安全候选或 Director 正忙时不强迫反应。普通 Director 时间、Kai 短任务/回柜台、社交 LLM 与 fallback、人物图片、移动和遮挡保持原有规则。
 
@@ -747,3 +747,33 @@ Quality-pass verification: 238 Node tests and 958 browser/runtime checks passed;
 开发页可即时触发全部四事件，显示 EVENT / RESPONDER / BARK / AUDIO STATE 和跳过原因。手动触发保留概率、路线限制与交互锁，因此“没有角色反应”也是正常结果。生产构建不包含调试触发 listener 或调试面板。Vite 端口只提供前端；真实玩家/社交 LLM 仍需既有 Vercel 本地后端。无需真实 API 的生产回归使用 `node tests/cold-assets-server.mjs`，随后打开 `http://127.0.0.1:5187/__demo__/production.browser.html`，该服务仅使用测试回复。
 
 Stage 5 最终验证：**261 项 Node 测试、977 项完整浏览器检查（含 19 项世界专用检查）、41 项生产流程检查**通过，冷加载可见性采样 **160 次**。build / diff check 通过。运行时与独立生产主页 Console 无 error/warning；生产 iframe 自动化日志的一条 MutationObserver 报错、真实模型与主观音质的验收边界详见 [完整实施报告](docs/stage-5-implementation-report.md)。未 commit/tag/push。
+
+
+### Final Polish — seven focused adjustments
+
+- Gentle rain gains: **0.22 / 0.34 / 0.46**, master **0.65**, unchanged 3-second transitions. Sparse local window-drop snippets and a separate quiet Cat meow respect sound controls and cleanup; sources/licenses are in [audio notes](public/assets/audio/README.md).
+- Social opportunities retain the existing **90–180s** pacing and safety gates. Each eligible exchange chooses **70% remote / 30% approach**, sharing the same generation/fallback pipeline. Remote mode preserves both current positions/activities and releases its reservation on completion or player interruption. The prompt no longer falsely assumes Mira has walked to the counter.
+- Cat yawning/scratching are **2–4s local poses**, with **60–100s opportunities / 50% chance** while awake, settled and unblocked. Ordinary activity/world changes do not restart the opportunity clock. Unsafe opportunities are dropped; movement, a new activity, player interaction or recent world events cancel an active pose. No new Director activity or movement route.
+- Player requests settle locally after **8s** without a usable reply: a short NPC-specific line replaces loading, the draft remains available, and the failed turn/fallback is excluded from history. The stale request is invalidated before abort, so a late reply cannot overwrite a newer turn. Server/model/fallback configuration remains unchanged.
+- Mira's existing portrait is horizontally mirrored, preserving its crop, scale and layout.
+- Cat meow: independent **20–40s opportunities / 35% chance**, no stacking or missed-sound replay. It is not tied to Cat animations or major world events.
+
+Manual previews (Vite running on port 5176):
+
+- `/tests/world-preview.html`: compare rain states and SOUND ON/OFF; listen over several minutes for sparse drops and occasional meow.
+- `/tests/cat-micro.html`: immediate yawning/scratching at actual scene scale, existing activity routes and interruption lock; `?verify` runs its automatic regression.
+- `/tests/counter-preview.html`: shows REMOTE/APPROACH and existing generation diagnostics. It now uses a specific DEV trigger, avoiding collisions with unrelated timers. Real LLM requests still need the existing Vercel backend; the Vite-only server cannot supply them.
+- `/tests/dialogue-polish.html`: automated 8-second timeout, late-reply, retry and portrait tests using mock transport.
+
+Verification commands: `node --test tests/*.test.js`, `/tests/runtime.browser.html`, `npm run build`, then `node tests/cold-assets-server.mjs` and `/__demo__/production.browser.html` on port 5187. Restart this fixture before repeating the production test because its injected one-time failure is session-scoped. The production fixture uses fake provider replies and deliberately delays cold sprite requests; it drains that stress-test queue before separately testing API timing.
+
+See [Final Polish verification report](docs/final-polish-report.md) for results and manual acceptance limits. No new dependency, deployment, model configuration change, commit, tag or push.
+
+
+#### Final Polish follow-up — Dialogue Brevity
+
+Player replies now follow **Kai 1–2 short sentences / Mira 1–3 short sentences**. The server-owned character prompt targets **20–60 Chinese characters total including punctuation**, permits shorter acknowledgements, and reserves **80–100 characters** for rare necessary contextual replies. One main thought per turn; no monologues, repeated emotional elaboration or routine extra self-description. Long prior assistant messages or player requests for essays do not relax this instruction. Mira remains a tired, quiet graduate student with slight self-deprecation.
+
+`server/characters.js` owns the player-specific character/length contract; `server/scene-tone.js` uses matching sentence counts without weakening permanent atmosphere. Existing primary/fallback requests reuse identical generation messages, including activity, event and history. The social exchange JSON format and its existing per-line limits remain intact. Fixed player-choice replies in `shared/npcs.js` were shortened too; existing 8-second timeout lines already fit and remain unchanged.
+
+Model selection, reasoning configuration, provider fallback and `max_tokens: 512` remain unchanged. The token ceiling is a transport safety ceiling, not the desired answer length; no string clipping, extra rewrite request or new rejection/fallback loop was added. Automated regressions verify prompt delivery/context preservation, **not guaranteed LLM length compliance**. Live dialogue length and tone still require manual acceptance with the functioning API backend. This follow-up passed **285 Node tests**, production build and diff check; earlier browser results above belong to the seven-item pass.

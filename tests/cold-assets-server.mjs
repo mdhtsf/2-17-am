@@ -8,9 +8,10 @@ import { createSocialHandler } from '../server/social-handler.js'
 import { createChatHandler } from '../server/chat-handler.js'
 const root = fileURLToPath(new URL('../dist', import.meta.url))
 const failedOnce = new Set()
+let pendingSprites = 0
 // Real HTTP/API validation with a deliberately fake provider, only in this fixture.
 const chat = createChatHandler(async ({ npc, message }) => {
-  await new Promise(resolve => setTimeout(resolve, message === '测试延迟' ? 3000 : 1000))
+  await new Promise(resolve => setTimeout(resolve, message === '测试超时' ? 10000 : message === '测试延迟' ? 3000 : 1000))
   if (message === '测试重试' && !failedOnce.has(npc.id)) {
     failedOnce.add(npc.id)
     throw new Error('Intentional one-time demo failure')
@@ -22,6 +23,11 @@ const social = createSocialHandler(async () => ({ lines: [{ speaker: 'mira', tex
 const mime = { '.mp3': 'audio/mpeg', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' }
 createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost')
+  if (url.pathname === '/__demo__/asset-status') {
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    response.end(JSON.stringify({ pendingSprites }))
+    return
+  }
   if (['/api/chat', '/api/social-chat'].includes(url.pathname)) {
     try {
       const chunks = []
@@ -48,7 +54,11 @@ createServer(async (request, response) => {
     // Repeatable first event: Kai. Keep the real 8s/16s director delays.
     if (extname(file) === '.html') data = Buffer.from(data.toString().replace('<head>', '<head><script>Math.random=()=>0</script>'))
     const initial = ['/kai.png', '/mira-idle.png', '/cat-sleeping.png'].some(path => file.endsWith(path))
-    if (file.includes('/npcs/') && !initial) await new Promise(resolve => setTimeout(resolve, 12000))
+    if (file.includes('/npcs/') && !initial) {
+      pendingSprites++
+      try { await new Promise(resolve => setTimeout(resolve, 12000)) }
+      finally { pendingSprites-- }
+    }
     response.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' })
     response.end(data)
   } catch { response.writeHead(404).end() }

@@ -1,5 +1,5 @@
 // Curated fallback for failed or unfinished ambient generation. No player history.
-export const COUNTER_SOCIAL = Object.freeze({ opportunityMs: [90000, 180000], lineMs: [2200, 2800] })
+export const COUNTER_SOCIAL = Object.freeze({ opportunityMs: [90000, 180000], lineMs: [2200, 2800], remoteProbability: 0.7 })
 export const counterConversations = Object.freeze([
   { id: 'coffee', lines: [
     { npcId: 'mira', text: '这杯算明天的咖啡吗？' },

@@ -2,15 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createSoundscape } from '../src/audio/soundscape.js'
 
-function audioFixture(resume = async () => {}, fetchAudio = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })) {
+function audioFixture(resume = async () => {}, fetchAudio = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }), options = {}) {
   const nodes = [], states = []
   let closed = 0, created = 0
   const param = () => ({ value: 0, ramps: [], cancelScheduledValues() {}, setValueAtTime(value) { this.value = value },
     linearRampToValueAtTime(value, time) { this.value = value; this.ramps.push({ value, time }) } })
   function node(kind) {
-    const n = { kind, gain: param(), frequency: param(), Q: param(), connections: [], stops: 0,
+    const n = { kind, gain: param(), frequency: param(), playbackRate: param(), Q: param(), connections: [], stops: 0,
       connect(to) { this.connections.push(to) }, disconnect() { this.connections = [] },
-      start() {}, stop() { this.stops++ } }
+      start(...args) { this.started = args }, stop() { this.stops++ } }
     nodes.push(n); return n
   }
   const context = { currentTime: 0, sampleRate: 100, state: 'running', destination: {}, resume,
@@ -19,7 +19,7 @@ function audioFixture(resume = async () => {}, fetchAudio = async () => ({ ok: t
     createBuffer: (_, size) => ({ getChannelData: () => new Float32Array(size) }),
     close: async () => { closed++; context.state = 'closed' },
   }
-  const sound = createSoundscape({ createContext: () => { created++; return context }, fetchAudio, onState: state => states.push(state) })
+  const sound = createSoundscape({ createContext: () => { created++; return context }, fetchAudio, onState: state => states.push(state), ...options })
   return { sound, nodes, states, context, created: () => created, closed: () => closed }
 }
 
@@ -56,12 +56,12 @@ test('recorded rain loops with absolute weather levels and no indoor source', as
   assert.equal(f.nodes.filter(n => n.kind === 'buffer').length, 1)
   assert.equal(f.nodes.find(n => n.kind === 'buffer').loop, true)
   assert.equal(f.nodes.filter(n => n.kind === 'oscillator').length, 0)
-  f.sound.applyEvent('rain_intensifies'); assert.equal(rain.gain.value, 0.7)
-  f.sound.applyEvent('rain_intensifies'); assert.equal(rain.gain.value, 0.7)
+  f.sound.applyEvent('rain_intensifies'); assert.equal(rain.gain.value, 0.46)
+  f.sound.applyEvent('rain_intensifies'); assert.equal(rain.gain.value, 0.46)
   f.sound.setMuted(true); f.sound.applyEvent('rain_softens'); f.sound.setMuted(false)
   assert.equal(master.gain.value, 0.65); assert.equal(rain.gain.value, 0.22)
   assert.equal(f.states.at(-1).rainState, 'softened')
-  f.sound.applyEvent('quiet_lull'); assert.equal(rain.gain.value, 0.4)
+  f.sound.applyEvent('quiet_lull'); assert.equal(rain.gain.value, 0.34)
   assert.equal(rain.gain.ramps.at(-1).time, 3)
   assert.equal(f.states.at(-1).rainState, 'baseline'); f.sound.dispose()
 })
@@ -141,5 +141,130 @@ test('download deadline fails safely rather than leaving an active loading reque
   await pending
   assert.equal(f.states.at(-1).status, 'unavailable')
   assert.equal(f.closed(), 1)
+  f.sound.dispose()
+})
+
+function scheduledFixture(random = () => 0, fetchAudio) {
+  let now = 0, nextId = 0
+  const jobs = new Map()
+  const options = {
+    random,
+    setTimer(callback, delay) { const id = ++nextId; jobs.set(id, { callback, delay, at: now + delay }); return id },
+    clearTimer(id) { jobs.delete(id) },
+  }
+  const f = audioFixture(undefined, fetchAudio, options)
+  return { ...f, jobs, advance(ms) {
+    const target = now + ms
+    for (;;) {
+      const first = [...jobs].sort((a, b) => a[1].at - b[1].at)[0]
+      if (!first || first[1].at > target) break
+      now = first[1].at; jobs.delete(first[0]); first[1].callback()
+    }
+    now = target
+  } }
+}
+const settleLoads = () => new Promise(resolve => setImmediate(resolve))
+const oneShots = f => f.nodes.filter(n => n.kind === 'buffer' && !n.loop)
+
+test('meow opportunities are randomized, probabilistic, and cannot stack', async () => {
+  const f = scheduledFixture()
+  await f.sound.unlock(); await settleLoads()
+  assert.ok([...f.jobs.values()].some(job => job.delay === 20000))
+  f.advance(19999)
+  assert.equal(oneShots(f).filter(n => n.started.length === 1).length, 0)
+  f.advance(1)
+  const meows = oneShots(f).filter(n => n.started.length === 1)
+  assert.equal(meows.length, 1, 'first opportunity may play a whole short meow recording')
+  assert.equal(meows[0].loop, undefined)
+  f.advance(20000)
+  assert.equal(oneShots(f).filter(n => n.started.length === 1).length, 1, 'unfinished meow never stacks')
+  meows[0].onended()
+  f.advance(20000)
+  assert.equal(oneShots(f).filter(n => n.started.length === 1).length, 2)
+  f.sound.dispose(); assert.equal(f.jobs.size, 0)
+
+  const skipped = scheduledFixture(() => 0.99)
+  await skipped.sound.unlock(); await settleLoads()
+  assert.ok([...skipped.jobs.values()].some(job => job.delay >= 39000 && job.delay <= 40000))
+  skipped.advance(120000)
+  assert.equal(oneShots(skipped).length, 0, 'not every meow or droplet opportunity must make sound')
+  skipped.sound.dispose()
+})
+
+test('droplet snippets are sparse, softened with the rain, and removed on disposal', async () => {
+  const f = scheduledFixture()
+  await f.sound.unlock(); await settleLoads()
+  f.advance(2999); assert.equal(oneShots(f).length, 0)
+  f.advance(1)
+  const first = oneShots(f)[0]
+  assert.ok(first, 'a low probability opportunity can add a recorded window-drop detail')
+  assert.equal(first.started.length, 3, 'a bounded fragment, not a second ambience loop')
+  assert.ok(first.started[2] <= 0.7)
+  const baseline = first.connections[0].gain.ramps[0].value
+  assert.ok(baseline > 0 && baseline < 0.15)
+  first.onended()
+  f.sound.applyEvent('rain_softens'); f.advance(3000)
+  const soft = oneShots(f).at(-1)
+  assert.ok(soft.connections[0].gain.ramps[0].value < baseline)
+  soft.onended()
+  f.sound.applyEvent('rain_intensifies'); f.advance(3000)
+  const strong = oneShots(f).at(-1)
+  assert.ok(strong.connections[0].gain.ramps[0].value > baseline)
+  assert.ok(strong.connections[0].gain.ramps[0].value < 0.15)
+  f.sound.dispose()
+  assert.equal(f.jobs.size, 0)
+  assert.ok(f.nodes.every(n => n.connections.length === 0))
+})
+
+test('muted or suspended opportunities are discarded and never replay on unmute', async () => {
+  const f = scheduledFixture()
+  await f.sound.unlock(); await settleLoads()
+  f.sound.setMuted(true); f.advance(40000)
+  assert.equal(oneShots(f).length, 0)
+  f.sound.setMuted(false)
+  assert.equal(oneShots(f).length, 0, 'unmute restores bed only; no backlog')
+  f.context.state = 'suspended'; f.advance(40000)
+  assert.equal(oneShots(f).length, 0)
+  f.context.state = 'running'; f.advance(20000)
+  assert.ok(oneShots(f).some(n => n.started.length === 1))
+  f.sound.dispose()
+})
+
+test('optional detail and meow failures do not disable rain or door playback', async () => {
+  const f = scheduledFixture(() => 0, async url => ({ ok: url.endsWith('rain-loop.mp3'), arrayBuffer: async () => new ArrayBuffer(8) }))
+  await f.sound.unlock(); await settleLoads()
+  assert.equal(f.states.at(-1).status, 'running')
+  f.advance(60000); assert.equal(oneShots(f).length, 0)
+  f.sound.applyEvent('door_noise')
+  assert.equal(f.nodes.filter(n => n.kind === 'oscillator').length, 1)
+  f.sound.dispose(); assert.equal(f.jobs.size, 0)
+})
+
+test('disposing while optional assets decode prevents late cues and clears every timer', async () => {
+  const pending = []
+  const f = scheduledFixture(() => 0, async (url, { signal }) => {
+    if (url.endsWith('rain-loop.mp3')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }
+    return { ok: true, arrayBuffer: () => new Promise(resolve => pending.push({ signal, resolve })) }
+  })
+  await f.sound.unlock(); await settleLoads()
+  assert.equal(pending.length, 2)
+  f.sound.dispose()
+  assert.ok(pending.every(load => load.signal.aborted))
+  assert.equal(f.jobs.size, 0, 'even uncooperative pending optional loads have no live timer')
+  for (const load of pending) load.resolve(new ArrayBuffer(8))
+  await settleLoads(); f.advance(80000)
+  assert.equal(oneShots(f).length, 0)
+})
+
+test('muting active detail cues releases them and unmute does not replay their tail', async () => {
+  const f = scheduledFixture()
+  await f.sound.unlock(); await settleLoads()
+  f.advance(20000)
+  const active = oneShots(f)
+  assert.equal(active.length, 2)
+  f.sound.setMuted(true)
+  assert.ok(active.every(n => n.stops === 1 && n.connections.length === 0))
+  f.sound.setMuted(false)
+  assert.equal(oneShots(f).length, 2)
   f.sound.dispose()
 })

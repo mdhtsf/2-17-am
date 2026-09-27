@@ -87,6 +87,13 @@ export function useNpcActivities({ interactingId = null, catInteracting = false 
     return () => window.removeEventListener('world-event-trigger', trigger)
   }, [world])
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const trigger = () => coherence.trigger()
+    window.addEventListener('counter-social-trigger', trigger)
+    return () => window.removeEventListener('counter-social-trigger', trigger)
+  }, [coherence])
+
   return { activities, completedActivities, speech: socialSpeech || worldSpeech,
     recentWorldEvent, getRecentWorldEvent: world.getRecentWorldEvent,
     getNpcActivity, setNpcActivity, advanceNpcActivity, resetNpcActivities, movementObservers }

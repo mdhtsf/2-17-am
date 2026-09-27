@@ -7,7 +7,9 @@ import { getNpcSceneLocation } from '../src/game/npcSceneLocation.js'
 import { getNpcWaypoint, sceneWaypointEdges } from '../src/data/sceneWaypoints.js'
 import { counterConversations } from '../src/data/counterConversations.js'
 
-function fixture(random = () => 0, generate = null) {
+function fixture(random = () => 0, generate = null, presentationDraw = 0.7) {
+  const draws = []
+  const nextRandom = () => draws.length ? draws.shift() : random()
   const debugEvents = []
   const timers = new Map(), speech = [], assignments = [], ambientEvents = []
   let activities = { ...createInitialNpcActivities() }, serial = 0
@@ -15,7 +17,7 @@ function fixture(random = () => 0, generate = null) {
   const assign = (id, activity) => { activities = { ...activities, [id]: activity }; assignments.push([id, activity]) }
   const director = createAmbientDirector({ ...clock, random, getActivities: () => activities,
     onActivity: (id, activity) => { ambientEvents.push([id, activity]); assign(id, activity) } })
-  const coherence = createCounterCoherence({ ...clock, random, generate, onDebug: event => debugEvents.push(event), director, getActivities: () => activities, assign, onSpeech: line => speech.push(line) })
+  const coherence = createCounterCoherence({ ...clock, random: nextRandom, generate, onDebug: event => debugEvents.push(event), director, getActivities: () => activities, assign, onSpeech: line => speech.push(line) })
   const report = (id, phase = 'idle', destination = getNpcSceneLocation(id, activities[id])) => {
     const movement = { phase, destination }
     director.reportMovement(id, movement); coherence.report(id, movement)
@@ -25,7 +27,9 @@ function fixture(random = () => 0, generate = null) {
   const fire = predicate => {
     const entry = [...timers].find(([, t]) => predicate(t.ms))
     assert.ok(entry, 'expected timer exists')
-    timers.delete(entry[0]); entry[1].fn(); return entry[1].fn
+    timers.delete(entry[0]);
+    if (opportunity(entry[1].ms)) draws.push(presentationDraw)
+    entry[1].fn(); return entry[1].fn
   }
   return { debugEvents, coherence, director, timers, speech, assignments, ambientEvents, report, assign, fire, get activities() { return activities } }
 }
@@ -238,4 +242,119 @@ test('request timer starts before arrival, is not reset by arrival, and is clear
  assert.equal(signal.aborted,true);assert.equal(f.timers.has(before[0]),false)
  before[1].fn();assert.equal(f.speech.filter(Boolean).length,0)
  f.coherence.stop()
+})
+
+
+test('social presentation selects remote below 70 percent and approach from that boundary', () => {
+  for (const [draw, expected] of [[0, 'remote'], [0.69999, 'remote'], [0.7, 'approach'], [0.99999, 'approach']]) {
+    const f = fixture(() => 0, null, draw)
+    f.fire(opportunity)
+    assert.equal(f.debugEvents[0].presentation, expected)
+    assert.equal(f.activities.mira, expected === 'remote' ? 'reading_notes' : 'talking_to_kai')
+    f.coherence.stop()
+  }
+})
+test('remote exchange keeps both activities and positions, holds reservation and releases after last line', () => {
+  const f = fixture(() => 0, null, 0)
+  const before = { ...f.activities }
+  const staleAmbient = [...f.timers.values()].find(t => t.ms === 8000).fn
+  f.fire(opportunity); staleAmbient()
+  assert.deepEqual(f.activities, before)
+  assert.equal(f.assignments.length, 0)
+  assert.equal(f.director.reserve('other-event'), false)
+  assert.equal(f.speech.at(-1).npcId, 'mira')
+  f.fire(line); f.fire(line); f.fire(line)
+  assert.equal(f.speech.at(-1), null)
+  assert.deepEqual(f.activities, before)
+  assert.equal(f.assignments.length, 0)
+  assert.equal(f.director.reserve('other-event'), true)
+  f.director.release('other-event'); f.coherence.stop()
+})
+test('remote conversations require a current settled destination and keep each valid Mira location', () => {
+  for (const activity of ['reading_notes', 'checking_phone', 'choosing_drink', 'staring_out_window']) {
+    const f = fixture(() => 0, null, 0)
+    f.assign('mira', activity); f.report('mira')
+    const before = f.assignments.length
+    f.fire(opportunity)
+    assert.equal(f.activities.mira, activity)
+    assert.equal(f.assignments.length, before)
+    assert.ok(f.speech.at(-1))
+    f.coherence.stop()
+  }
+  const stale = fixture(() => 0, null, 0)
+  stale.assign('mira', 'choosing_drink') // No arrival report for the new destination yet.
+  stale.fire(opportunity)
+  assert.equal(stale.speech.filter(Boolean).length, 0)
+  assert.equal(stale.director.reserve('other-event'), true)
+  stale.coherence.stop()
+})
+test('remote generation shares semantic context, aborts on interaction and never restores or replays stale work', async () => {
+  for (const npcId of ['kai', 'mira']) {
+    let resolve, signal, context
+    const f = fixture(() => 0, (c, s) => { context = c; signal = s; return new Promise(r => { resolve = r }) }, 0)
+    f.fire(opportunity); await flush()
+    assert.equal(context.miraActivity, 'talking_to_kai')
+    assert.equal(context.miraPreviousActivity, 'reading_notes')
+    assert.equal(f.assignments.length, 0)
+    assert.equal(f.director.reserve('other-event'), false)
+    f.coherence.setInteractionLocks([npcId])
+    assert.equal(signal.aborted, true)
+    resolve({ lines: [{ speaker: 'mira', text: '迟了。' }, { speaker: 'kai', text: '嗯。' }] }); await flush()
+    assert.equal(f.speech.filter(Boolean).length, 0)
+    assert.equal(f.director.reserve('other-event'), true)
+    f.director.release('other-event'); f.coherence.setInteractionLocks([])
+    assert.equal(f.assignments.length, 0)
+    assert.ok([...f.timers.values()].some(t => t.ms === 8000))
+    f.coherence.stop()
+  }
+})
+test('remote speech cancels immediately on external activity or movement changes', () => {
+  for (const moving of [false, true]) {
+    const f = fixture(() => 0, null, 0)
+    f.fire(opportunity)
+    const staleLine = [...f.timers.values()].find(t => line(t.ms)).fn
+    if (moving) f.report('mira', 'walking')
+    else { f.assign('mira', 'choosing_drink'); f.report('mira') }
+    staleLine()
+    assert.equal(f.speech.at(-1), null)
+    assert.equal(f.activities.mira, moving ? 'reading_notes' : 'choosing_drink')
+    assert.equal(f.assignments.length, moving ? 0 : 1)
+    f.report('mira')
+    assert.equal(f.director.reserve('other-event'), true)
+    f.coherence.stop()
+  }
+})
+
+test('explicit preview opportunity uses the same safety gate and leaves one fresh cooldown', () => {
+  const f = fixture(() => 0)
+  const old = [...f.timers].find(([, timer]) => opportunity(timer.ms))
+  assert.equal(f.coherence.trigger(), true)
+  assert.equal(f.timers.has(old[0]), false)
+  assert.equal(f.debugEvents.filter(event => event.phase === 'speaking').length, 1)
+  assert.equal([...f.timers.values()].filter(timer => opportunity(timer.ms)).length, 1)
+  old[1].fn() // Already queued callback must not create a duplicate opportunity.
+  assert.equal(f.coherence.trigger(), false)
+  assert.equal(f.debugEvents.filter(event => event.phase === 'speaking').length, 1)
+  assert.equal([...f.timers.values()].filter(timer => opportunity(timer.ms)).length, 1)
+  f.director.stop(); f.coherence.stop()
+  assert.equal(f.coherence.trigger(), false)
+  assert.equal(f.timers.size, 0)
+})
+test('explicit preview trigger cannot bypass interaction, current movement or another reservation', () => {
+  for (const block of [
+    f => f.coherence.setInteractionLocks(['mira']),
+    f => f.coherence.setInteractionLocks(['kai']),
+    f => f.report('cat', 'walking'),
+    f => f.director.reserve('world-event'),
+    f => { f.assign('kai', 'making_coffee'); f.report('kai') },
+  ]) {
+    const f = fixture()
+    block(f)
+    const assignments = f.assignments.length
+    assert.equal(f.coherence.trigger(), false)
+    assert.equal(f.assignments.length, assignments)
+    assert.equal(f.speech.filter(Boolean).length, 0)
+    assert.equal([...f.timers.values()].filter(timer => opportunity(timer.ms)).length, 1)
+    f.coherence.stop()
+  }
 })

@@ -13,6 +13,8 @@ export async function verifyPortraits(root, container, check) {
     const face = portrait.getBoundingClientRect(), body = container.querySelector('.dialogue-body').getBoundingClientRect()
     check(face.right < body.left && body.width > face.width * 2, `${id}: left portrait supports a larger readable text column`)
     check(container.querySelector('h2').textContent === id.toUpperCase() && container.querySelector('form'), `${id}: portrait preserves English name and input behavior`)
+    check(getComputedStyle(portrait).transform === (id === 'mira' ? 'matrix(-1, 0, 0, 1, 0, 0)' : 'none'),
+      `${id}: only Mira portrait is mirrored without changing the crop or layout`)
   }
   await act(async () => container.querySelector('.close-dialogue').click())
   await act(async () => container.querySelector('.npc-cat').click())

@@ -7,14 +7,16 @@ const errors = []
 const requests = []
 const check = (ok, label) => { if (!ok) throw new Error(label); checks.push(label) }
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
-const until = async (predicate, label) => {
+const until = async (predicate, label, timeout = 20000) => {
   const start = Date.now()
-  while (!predicate()) {
-    if (Date.now() - start > 20000) throw new Error(`Timed out: ${label}`)
+  while (!(await predicate())) {
+    if (Date.now() - start > timeout) throw new Error(`Timed out: ${label}`)
     await pause(50)
   }
 }
 let doc, win, monitor
+const drainColdAssets = () => until(async () => (await (await fetch('/__demo__/asset-status')).json()).pendingSprites === 0,
+  'cold sprite request queue drains', 90000)
 const open = async () => {
   const path = '/?demoRun=' + Date.now()
   frame.src = path
@@ -58,6 +60,10 @@ try {
     'cold production load: no blank or duplicate sprites throughout first movement/activity')
   check(samples.some(s => s.some(n => n.phase === 'walking')) && samples.some(s => s.some(n => n.mode === 'activity')),
     'cold sample includes walking and decoded activity visuals')
+  // The fixture delays every non-base sprite by 12s, filling HTTP/1 connection
+  // slots. Finish that stress phase before measuring the separate API/UX flow;
+  // otherwise even a 1s fake provider can queue behind several asset batches.
+  await drainColdAssets()
   await click('.npc-kai')
   check(doc.querySelector('h2').textContent === 'KAI', 'Kai dialogue opens')
   let worldDebug = 0
@@ -76,8 +82,18 @@ try {
   await send('再聊一句')
   await until(() => doc.querySelector('input').value === '', 'second reply')
   check(requests.at(-1).history.length === 2 && requests.at(-1).activity === 'behind_counter', 'second request includes prior turn and returned counter activity')
+  await send('测试超时')
+  await until(() => !doc.querySelector('input').readOnly, 'eight-second dialogue fallback')
+  check(doc.querySelector('.spoken').textContent !== '夜班。总得有人醒着。' && !doc.querySelector('[role="alert"]')
+    && doc.querySelector('input').value === '测试超时', 'production timeout shows in-world speech and preserves the draft')
+  await send('换一个问题')
+  await until(() => doc.querySelector('input').value === '', 'new request after timeout')
+  check(requests.at(-1).history.length === 4, 'production retry context excludes the expired turn and fallback')
+  await pause(1300)
+  check(doc.querySelector('.spoken').textContent === '夜班。总得有人醒着。', 'expired HTTP response cannot overwrite the newer reply')
   await click('.npc-mira')
   check(doc.querySelector('[data-portrait="mira"] img')?.complete, 'switching shows the loaded Mira portrait')
+  check(win.getComputedStyle(doc.querySelector('[data-portrait="mira"]')).transform === 'matrix(-1, 0, 0, 1, 0, 0)', 'production Mira portrait uses the approved orientation transform')
   await send('测试重试')
   await until(() => doc.querySelector('[role="alert"]'), 'injected failure')
   check(doc.querySelector('input').value === '测试重试' && requests.at(-1).history.length === 0, 'failure retains draft; Mira history is isolated')
@@ -113,6 +129,7 @@ try {
   check(doc.querySelector('[data-portrait="cat"] img')?.complete, 'Cat feedback shows its loaded portrait')
   check(doc.querySelector('.scene-art').getAttribute('src') === art, 'scene artwork is unchanged throughout interaction')
   await open()
+  await drainColdAssets()
   await click('.npc-kai')
   check(doc.querySelector('.spoken').textContent === '还没睡？', 'browser refresh restores opening dialogue')
   await send('刷新之后')

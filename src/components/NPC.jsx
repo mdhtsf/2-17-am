@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react'
 import { useNpcMovement } from '../hooks/useNpcMovement.js'
 
 // One entity owns the sprite, label and hit area so they share every transition.
-export default function NPC({ npc, visual, anchor, selected, onSelect, currentActivity, logicalLocation, onMovementChange, activityComplete = false, speech }) {
+export default function NPC({ npc, visual, anchor, selected, onSelect, currentActivity, logicalLocation, onMovementChange, activityComplete = false, speech, catMicroBlocked = true }) {
   const { id, name } = npc
   const entityRef = useRef(null)
   const movement = useNpcMovement(anchor, entityRef, true, logicalLocation, id, id === 'cat' ? CAT_MOVEMENT : undefined)
@@ -32,7 +32,7 @@ export default function NPC({ npc, visual, anchor, selected, onSelect, currentAc
     {id === 'kai' ? <KaiSprite visual={visual} movement={movement} activity={activityComplete ? undefined : currentActivity} />
       : id === 'mira' ? <WalkingSprite visual={visual} movement={movement} npcId="mira"
           getWalkingVisual={getMiraWalkingVisual} registration={miraWalkingRegistration} activity={currentActivity} />
-      : <CatSprite visual={visual} movement={movement} activity={currentActivity} />}
+      : <CatSprite visual={visual} movement={movement} activity={currentActivity} microBlocked={catMicroBlocked || selected} />}
     {speech && <AmbientSpeechBubble key={speech.key} speech={speech} />}
     <span className="npc-indicator" aria-hidden="true">···</span>
     <span className="npc-label" aria-hidden="true">{name}<small>{selected ? '▾' : '·'}</small></span>

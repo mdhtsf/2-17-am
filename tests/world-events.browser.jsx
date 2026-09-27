@@ -79,7 +79,7 @@ async function verifyRepeatedAudio(root, container, check) {
   window.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })
   let oscillators = 0, ended = null
   const param = () => ({ value: 0, cancelScheduledValues() {}, setValueAtTime(v) { this.value = v }, linearRampToValueAtTime(v) { this.value = v } })
-  const node = () => ({ gain: param(), frequency: param(), connect() {}, disconnect() {}, start() {}, stop() {} })
+  const node = () => ({ gain: param(), frequency: param(), playbackRate: param(), connect() {}, disconnect() {}, start() {}, stop() {} })
   window.AudioContext = class {
     currentTime = 0; sampleRate = 100; state = 'running'; destination = {}
     resume() { return Promise.resolve() }

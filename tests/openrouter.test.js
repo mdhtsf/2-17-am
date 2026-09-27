@@ -377,11 +377,40 @@ test('repeated turns and forged relationship/atmosphere fields never change perm
   assert.ok(sent.every(body => body.messages[0].content === getCharacterPrompt('kai') && body.messages[1].content === sceneTone))
   assert.match(sceneTone, /凌晨雨夜/)
   assert.match(sceneTone, /不因为对话轮数增加/)
-  assert.match(sceneTone, /Kai.*1～3 句/)
-  assert.match(sceneTone, /Mira.*2～4 句/)
+  assert.match(sceneTone, /Kai.*1～2 句/)
+  assert.match(sceneTone, /Mira.*1～3 句/)
   assert.ok(sent.every(body => !JSON.stringify(body).includes('be extremely enthusiastic')))
   assert.ok(sent.every(body => !JSON.stringify(body).includes('familiarity')))
 })
+
+for (const [npc, sentences, activity, identity] of [
+  ['kai', '1～2', 'making_coffee', /夜班店员/],
+  ['mira', '1～3', 'reading_notes', /研究生/],
+]) {
+  test(`${npc}: primary and fallback receive brevity rules without dropping activity, event or history`, async t => {
+    const sent = []
+    configure(t, async (_, options) => {
+      sent.push(JSON.parse(options.body))
+      return sent.length === 1 ? Response.json({}, { status: 503 }) : success()
+    }, 'test-placeholder', primaryModel, fallbackModel)
+    const history = [{ role: 'user', content: '今天很累。' },
+      { role: 'assistant', content: '之前说得太长。'.repeat(15) }]
+    assert.equal((await chat('你呢？', history, npc, { activity, recentWorldEvent: 'rain_softens' })).status, 200)
+    assert.deepEqual(sent.map(request => request.model), [primaryModel, fallbackModel])
+    assert.deepEqual(sent[0].messages, sent[1].messages)
+    for (const request of sent) {
+      const [character, , activityMessage, eventMessage] = request.messages
+      assert.match(character.content, identity)
+      assert.match(character.content, new RegExp(`通常.*${sentences} 句`))
+      assert.match(character.content, /20～60/)
+      assert.match(character.content, /80～100/)
+      assert.match(character.content, /一个主要意思/)
+      assert.match(activityMessage.content, npc === 'kai' ? /preparing coffee/ : /working on her paper/)
+      assert.match(eventMessage.content, /rain.*softer/i)
+      assert.deepEqual(request.messages.slice(4), [...history, { role: 'user', content: '你呢？' }])
+    }
+  })
+}
 
 test('world context precedes history and survives provider fallback unchanged', async t => {
   const sent = []
